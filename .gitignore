@@ -75,6 +75,7 @@ Thumbs.db
 
 # Project specific
 *.db
+dump.rdb
 data/
 docs/
 scripts/

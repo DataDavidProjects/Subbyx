@@ -33,6 +33,7 @@ services:
     environment:
       - DATA_PATH=/app/data
       - REDIS_URL=redis://redis:6379
+      - FEAST_REDIS_HOST=redis:6379
       - PYTHONUNBUFFERED=1
     volumes:
       - ../data:/app/data:ro

@@ -2,14 +2,17 @@
 # Subbyx Makefile
 # =============================================================================
 
-.PHONY: help install build up down restart logs clean-containers lint format \
+.PHONY: help install sync build up down restart logs clean-containers lint format \
         clean-data data-audit data-elaborate data-features data-process \
-        feast-apply feast-materialize feast-restart feast-status feast-ui \
+        redis feast-apply feast-materialize feast-restart feast-status feast-ui feast-verify \
         dev-backend dev-frontend dev mlflow model-register
 
 # Default dates for materialize
 START ?= 2024-01-01
 END ?= 2025-01-01
+
+# Default Redis host for Feast online store (overridden by docker-compose)
+export FEAST_REDIS_HOST ?= localhost:6379
 
 # -----------------------------------------------------------------------------
 # Setup & Installation
@@ -19,7 +22,8 @@ help:
 	@echo "Subbyx - Available commands:"
 	@echo ""
 	@echo "Setup:"
-	@echo "  make install          - Install all dependencies (backend + frontend)"
+	@echo "  make install          - Install all dependencies (backend + scripts + frontend)"
+	@echo "  make sync             - Re-sync Python deps (backend + scripts)"
 	@echo "  make build            - Build Docker images"
 	@echo ""
 	@echo "Docker (all services):"
@@ -28,6 +32,7 @@ help:
 	@echo "  make restart         - Restart all services"
 	@echo "  make logs            - Show live logs"
 	@echo "  make clean-containers - Remove containers and volumes"
+	@echo "  make redis           - Start local Redis on port 6379"
 	@echo ""
 	@echo "Data Pipeline:"
 	@echo "  make clean-data       - Clean raw CSV data"
@@ -38,11 +43,12 @@ help:
 	@echo ""
 	@echo "Feature Store:"
 	@echo "  make feast-apply             - Apply feature definitions to registry"
-	@echo "  make feast-materialize      - Materialize features to online store"
+	@echo "  make feast-materialize      - Materialize features to Redis online store"
 	@echo "  make feast-materialize START=2024-01-01 END=2025-01-01 - Custom dates"
 	@echo "  make feast-restart          - Apply + materialize"
 	@echo "  make feast-restart START=2024-01-01 END=2025-01-01 - Custom dates"
 	@echo "  make feast-status           - Show registered features"
+	@echo "  make feast-verify           - Check Redis has feature keys"
 	@echo "  make feast-ui               - Start Feast UI on http://localhost:8888"
 	@echo ""
 	@echo "Feature Selection:"
@@ -62,7 +68,13 @@ help:
 # Install all project dependencies
 install:
 	cd src/backend && uv sync
+	cd scripts && uv sync
 	cd src/frontend && npm install
+
+# Re-sync Python dependencies (backend + scripts)
+sync:
+	cd src/backend && uv sync
+	cd scripts && uv sync
 
 # Build Docker images
 build: install
@@ -97,6 +109,21 @@ logs:
 clean-containers:
 	cd docker && docker compose down -v
 	docker system prune -f
+
+# Start local Redis (tries docker, falls back to redis-server)
+redis:
+	@echo "Stopping any existing process on port 6379..."
+	@lsof -ti:6379 2>/dev/null | xargs kill -9 2>/dev/null || true
+	@docker rm -f subbyx-redis-local 2>/dev/null || true
+	@if docker info >/dev/null 2>&1; then \
+		docker run -d --name subbyx-redis-local -p 6379:6379 redis:7-alpine; \
+	elif command -v redis-server >/dev/null 2>&1; then \
+		redis-server --daemonize yes --port 6379; \
+	else \
+		echo "Error: neither Docker nor redis-server found. Install one of them."; \
+		exit 1; \
+	fi
+	@echo "Redis running on localhost:6379"
 
 # -----------------------------------------------------------------------------
 # Data Pipeline
@@ -135,7 +162,7 @@ data-aggregates:
 feast-apply:
 	cd src/backend/feature_repo && uv run feast apply
 
-# Materialize features to online store (SQLite/Redis)
+# Materialize features to Redis online store
 # Usage: make feast-materialize START=2024-01-01 END=2025-01-01
 feast-materialize:
 	cd src/backend/feature_repo && uv run feast materialize $(START) $(END)
@@ -148,6 +175,13 @@ feast-restart:
 # Show registered feature views
 feast-status:
 	cd src/backend/feature_repo && uv run feast registry-summary
+
+# Verify features are stored in Redis
+feast-verify:
+	@echo "Checking Redis for Feast feature keys..."
+	@docker exec subbyx-redis-local redis-cli keys '*' 2>/dev/null | head -20 || redis-cli keys '*' | head -20
+	@echo ""
+	@echo "Total keys: $$(docker exec subbyx-redis-local redis-cli dbsize 2>/dev/null || redis-cli dbsize)"
 
 # Run feature selection pipeline
 feature-selection:
@@ -177,8 +211,8 @@ format:
 # -----------------------------------------------------------------------------
 
 # Backend + MLflow (requires frontend/.env.local with NEXT_PUBLIC_API_URL=http://localhost:8001)
-dev-backend:
-	@echo "Stopping any existing processes on ports 8001 and 5002..."
+dev-backend: redis
+	@echo "Stopping any existing processes on ports 8001, 5002..."
 	@lsof -ti:8001 -ti:5002 2>/dev/null | xargs kill -9 2>/dev/null || true
 	sleep 2
 	@echo "Starting MLflow on http://localhost:5002..."
