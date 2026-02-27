@@ -1,0 +1,24 @@
+# Fraud detection configuration
+# Colocated with fraud routes module
+
+# Segment configuration with thresholds
+segments:
+  NEW_CUSTOMER:
+    description: First time customer with no prior checkout history
+    threshold: 0.005
+    default_threshold: 0.5
+  RETURNING:
+    description: Returning customer with at least one prior checkout
+    threshold: 0.23
+    default_threshold: 0.8
+
+# Segment lookup keys
+segment_keys:
+  new_customer: "NEW_CUSTOMER"
+  returning: "RETURNING"
+
+# Checkout mode
+checkout:
+  mode:
+    setup: "setup"
+    payment: "payment"

@@ -1,0 +1,12 @@
+# Shared configuration across routes
+# Common values used by multiple modules
+
+# Decision outcomes (shared across modules)
+decisions:
+  block: "BLOCK"
+  approve: "APPROVE"
+
+# Data paths (relative to project root or absolute)
+paths:
+  blacklist: "src/backend/feature_repo/data/blacklist.json"
+  data_dir: "data/01-clean"

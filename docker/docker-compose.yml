@@ -1,0 +1,67 @@
+name: subbyx-fraud
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: subbyx-fraud-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: subbyx-fraud-mlflow
+    ports:
+      - "5002:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE=sqlite:////mlflow/mlflow.db
+    volumes:
+      - mlflow_data:/mlflow
+
+  backend:
+    image: subbyx-fraud-backend
+    container_name: subbyx-fraud-backend
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATA_PATH=/app/data
+      - REDIS_URL=redis://redis:6379
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ../data:/app/data:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    image: subbyx-fraud-frontend
+    container_name: subbyx-fraud-frontend
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mlflow_data:

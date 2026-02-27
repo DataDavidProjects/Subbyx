@@ -1,0 +1,109 @@
+# Per-feature imputation configuration
+# This config is used at training time to impute missing values
+# Sentinel (-1) is used by default to distinguish "no history" from actual zeros
+
+imputation:
+  # Default strategy for unspecified features
+  default:
+    method: "sentinel"
+    sentinel: -1.0
+
+  # Per-feature imputation strategies
+  features:
+    # Match scores - clip to 0-1 range (they're similarity scores)
+    card_owner_names_card_owner_names_match_score:
+      method: "clip"
+      max_value: 1.0
+      
+    doc_name_email_match_score:
+      method: "clip"
+      max_value: 1.0
+      
+    email_emails_match_score:
+      method: "clip"
+      max_value: 1.0
+      
+    account_card_names_match_score:
+      method: "clip"
+      max_value: 1.0
+
+    # High-end features - sentinel for "no history"
+    high_end_count:
+      method: "sentinel"
+      sentinel: -1.0
+      
+    high_end_rate:
+      method: "sentinel"
+      sentinel: -1.0
+
+    # Charge features - sentinel for "no charge history"
+    charge_count:
+      method: "sentinel"
+      sentinel: 0.0
+      
+    charge_failure_rate:
+      method: "sentinel"
+      sentinel: -1.0
+      
+    recurring_charge_rate:
+      method: "sentinel"
+      sentinel: -1.0
+
+    # Payment intent features - sentinel for "no payment history"
+    intent_count:
+      method: "sentinel"
+      sentinel: 0.0
+      
+    total_failures:
+      method: "sentinel"
+      sentinel: 0.0
+      
+    payment_failure_rate:
+      method: "sentinel"
+      sentinel: -1.0
+
+    # Checkout history features - sentinel for "no checkout history"
+    prior_checkout_count:
+      method: "sentinel"
+      sentinel: 0.0
+      
+    avg_subscription_value:
+      method: "sentinel"
+      sentinel: -1.0
+      
+    distinct_categories:
+      method: "sentinel"
+      sentinel: 0.0
+
+    # Request features (from checkout data) - these come from the request, should rarely be null
+    segment:
+      method: "constant"
+      fill_value: "UNKNOWN"
+      
+    subscription_value:
+      method: "sentinel"
+      sentinel: -1.0
+      
+    grade:
+      method: "constant"
+      fill_value: "unknown"
+      
+    category:
+      method: "constant"
+      fill_value: "unknown"
+      
+    has_linked_products:
+      method: "constant"
+      fill_value: false
+      
+    has_vetrino:
+      method: "constant"
+      fill_value: false
+      
+    has_protezione_totale:
+      method: "constant"
+      fill_value: false
+      
+    has_protezione_furto:
+      method: "constant"
+      fill_value: false
