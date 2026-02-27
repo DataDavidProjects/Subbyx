@@ -45,6 +45,9 @@ help:
 	@echo "  make feast-status           - Show registered features"
 	@echo "  make feast-ui               - Start Feast UI on http://localhost:8888"
 	@echo ""
+	@echo "Feature Selection:"
+	@echo "  make feature-selection      - Run feature selection pipeline"
+	@echo ""
 	@echo "Code Quality:"
 	@echo "  make lint             - Run linters"
 	@echo "  make format          - Format code with ruff"
@@ -145,6 +148,10 @@ feast-restart:
 # Show registered feature views
 feast-status:
 	cd src/backend/feature_repo && uv run feast registry-summary
+
+# Run feature selection pipeline
+feature-selection:
+	cd scripts && uv run python feature_selection.py
 
 # Start Feast UI
 feast-ui:
