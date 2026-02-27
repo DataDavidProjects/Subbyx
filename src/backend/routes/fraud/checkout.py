@@ -173,6 +173,26 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
             segment=segment,
             segment_reason=segment_reason,
         )
+
+    # 2a. Stripe risk check
+    from routes.fraud.rules.stripe_risk import load_charges_with_highest_risk
+
+    high_risk_emails = load_charges_with_highest_risk()
+    if request.email in high_risk_emails:
+        logger.info(
+            "[BACKEND] Step 2a: STRIPE_RISK triggered for email=%s (segment=%s)",
+            request.email,
+            segment,
+        )
+        return CheckoutResponse(
+            decision="BLOCK",
+            reason="Email has highest risk level from Stripe",
+            rule_triggered="stripe_risk",
+            score=None,
+            segment=segment,
+            segment_reason=segment_reason,
+        )
+
     logger.info("[BACKEND] Step 2: No rules triggered")
 
     # 3. Build request features (checkout data + segment); Feast fetch happens per-model

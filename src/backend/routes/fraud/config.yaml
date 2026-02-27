@@ -1,6 +1,13 @@
 # Fraud detection configuration
 # Colocated with fraud routes module
 
+# Rules configuration
+rules:
+  blacklist:
+    enabled: true
+  stripe_risk:
+    enabled: true
+
 # Segment configuration with thresholds
 segments:
   NEW_CUSTOMER:
