@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
@@ -16,7 +17,8 @@ router = APIRouter(tags=["rules"])
 HIGHEST_RISK_LEVEL = "highest"
 
 
-def load_charges_with_highest_risk() -> set:
+@lru_cache(maxsize=1)
+def load_charges_with_highest_risk() -> frozenset:
     """Load emails that have charges with highest risk level."""
     data_dir = Path(shared_config.get("paths", {}).get("data_dir", "data/01-clean"))
     if not data_dir.is_absolute():
@@ -25,12 +27,12 @@ def load_charges_with_highest_risk() -> set:
     charges_path = data_dir / "charges.csv"
     if not charges_path.exists():
         logger.warning("charges.csv not found at %s", charges_path)
-        return set()
+        return frozenset()
 
     logger.debug("loading charges to find highest risk emails from %s", charges_path)
     df = pd.read_csv(charges_path)
     df_highest = df[df["outcome_risk_level"] == HIGHEST_RISK_LEVEL]
-    emails = set(df_highest["email"].dropna().unique())
+    emails = frozenset(df_highest["email"].dropna().unique())
     logger.debug("found %d emails with highest risk level", len(emails))
     return emails
 
@@ -46,7 +48,7 @@ def check_stripe_risk(request: BlacklistCheckRequest) -> BlacklistCheckResponse:
         return BlacklistCheckResponse(
             triggered=True,
             rule="stripe_risk",
-            reason=f"Email has highest risk level from Stripe",
+            reason="Email has highest risk level from Stripe",
         )
 
     logger.debug("email %s does not have highest risk level", request.email)

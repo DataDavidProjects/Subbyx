@@ -15,15 +15,12 @@ router = APIRouter(tags=["rules"])
 
 
 def load_blacklist() -> set:
-    blacklist_path = Path(
-        shared_config.get("paths", {}).get("blacklist", "data/blacklist.json")
-    )
+    blacklist_path = Path(shared_config.get("paths", {}).get("blacklist", "data/blacklist.json"))
     if not blacklist_path.is_absolute():
         # check.py: routes/fraud/rules/blacklist/check.py
         # parent: blacklist, rules, fraud, routes, backend, src, Subbyx (project root)
         blacklist_path = (
-            Path(__file__).parent.parent.parent.parent.parent.parent.parent
-            / blacklist_path
+            Path(__file__).parent.parent.parent.parent.parent.parent.parent / blacklist_path
         )
 
     logger.debug("loading blacklist from %s", blacklist_path)
