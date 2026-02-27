@@ -25,15 +25,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${poppins.variable} min-h-screen py-12 px-4`}>
         <nav className="max-w-6xl mx-auto mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-center">
             <Link href="/">
               <Logo />
             </Link>
-            <div className="flex items-center gap-6">
-              <NavLink href="/">Home</NavLink>
-              <NavLink href="/realtime">Realtime</NavLink>
-              <NavLink href="/batch">Batch</NavLink>
-            </div>
           </div>
         </nav>
         {children}

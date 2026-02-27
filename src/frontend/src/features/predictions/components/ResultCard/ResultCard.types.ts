@@ -5,6 +5,7 @@ export interface ResultCardProps {
   reason: string
   ruleTriggered?: string | null
   segmentReason?: string | null
+  productionScore?: number | null
   shadowScore?: number | null
   canaryScore?: number | null
   scoredBy?: string | null

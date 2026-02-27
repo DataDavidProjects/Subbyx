@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Check } from "lucide-react"
+import { Copy, Check, ArrowUpDown } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -80,6 +80,7 @@ export function CheckoutsTable({
   const [categoryFilter, setCategoryFilter] = useState<string>("")
   const [gradeFilter, setGradeFilter] = useState<string>("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
   const handleSearch = () => {
     onSearch(searchValue)
@@ -101,6 +102,12 @@ export function CheckoutsTable({
     const grade = value === "all" ? "" : value
     setGradeFilter(grade)
     onFilterChange({ grade: grade || undefined })
+  }
+
+  const handleSortToggle = () => {
+    const next = sortOrder === "desc" ? "asc" : "desc"
+    setSortOrder(next)
+    onFilterChange({ sort_order: next })
   }
 
   const handleCopyRow = async (checkout: FutureCheckout) => {
@@ -227,6 +234,10 @@ export function CheckoutsTable({
             ))}
           </SelectContent>
         </Select>
+        <Button variant="outline" onClick={handleSortToggle} className="gap-1.5">
+          <ArrowUpDown className="h-4 w-4" />
+          Date {sortOrder === "desc" ? "Newest" : "Oldest"}
+        </Button>
       </div>
 
       {/* Top scrollbar */}

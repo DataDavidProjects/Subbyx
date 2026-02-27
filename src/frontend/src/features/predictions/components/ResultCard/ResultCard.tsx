@@ -7,6 +7,7 @@ export function ResultCard({
   reason,
   ruleTriggered,
   segmentReason,
+  productionScore,
   shadowScore,
   canaryScore,
   scoredBy,
@@ -14,97 +15,132 @@ export function ResultCard({
   const isBlock = decision === "BLOCK"
   const isApprove = decision === "APPROVE"
 
+  const decisionColor = isBlock
+    ? "border-red-300 bg-red-50"
+    : isApprove
+    ? "border-green-300 bg-green-50"
+    : "border-yellow-300 bg-yellow-50"
+
+  const badgeColor = isBlock
+    ? "bg-red-600 text-white"
+    : isApprove
+    ? "bg-green-600 text-white"
+    : "bg-yellow-500 text-white"
+
   return (
-    <div
-      className={`rounded-lg border-2 p-6 ${
-        isBlock
-          ? "border-red-300 bg-red-50"
-          : isApprove
-          ? "border-green-300 bg-green-50"
-          : "border-yellow-300 bg-yellow-50"
-      }`}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-lg font-semibold">Decision:</span>
-        <div className="flex items-center gap-2">
-          {scoredBy === "canary" && (
-            <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-semibold uppercase">
-              Canary
+    <div className={`rounded-lg border-2 ${decisionColor} divide-y divide-gray-200`}>
+
+      {/* ---- Decision + Score ---- */}
+      <div className="flex items-center justify-between p-6">
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+            Decision
+          </p>
+          <div className="flex items-center gap-2">
+            <span className={`px-4 py-1.5 rounded-full text-sm font-bold ${badgeColor}`}>
+              {decision}
             </span>
+            {scoredBy === "canary" && (
+              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-semibold uppercase">
+                Canary
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="text-right">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+            Score
+          </p>
+          <span className="text-2xl font-mono font-bold text-gray-900">
+            {score !== null ? score.toFixed(4) : "—"}
+          </span>
+        </div>
+      </div>
+
+      {/* ---- Model Scores ---- */}
+      {(productionScore != null || shadowScore != null || canaryScore != null) && (
+        <div className="px-6 py-4">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
+            Model Scores
+          </p>
+          <div className="grid grid-cols-3 gap-4">
+            <ScoreCell
+              label="Production"
+              value={productionScore}
+              active={scoredBy === "production"}
+            />
+            <ScoreCell
+              label="Shadow"
+              value={shadowScore}
+            />
+            <ScoreCell
+              label="Canary"
+              value={canaryScore}
+              active={scoredBy === "canary"}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ---- Segment ---- */}
+      {segment && (
+        <div className="px-6 py-4">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+            Segment
+          </p>
+          <p className="font-semibold text-gray-900">{segment}</p>
+          {segmentReason && (
+            <p className="text-sm text-gray-600 mt-0.5">{segmentReason}</p>
           )}
-          <span
-            className={`px-4 py-2 rounded-full text-lg font-bold ${
-              isBlock
-                ? "bg-red-600 text-white"
-                : isApprove
-                ? "bg-green-600 text-white"
-                : "bg-yellow-500 text-white"
-            }`}
-          >
-            {decision}
-          </span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <span className="text-gray-600">Score:</span>
-          <span className="ml-2 font-mono font-semibold">
-            {score !== null ? score.toFixed(4) : "N/A"}
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-600">Segment:</span>
-          <span className="ml-2 font-semibold">{segment || "N/A"}</span>
-        </div>
-        {scoredBy && (
-          <div>
-            <span className="text-gray-600">Scored by:</span>
-            <span className={`ml-2 font-semibold ${
-              scoredBy === "canary" ? "text-amber-700" : "text-gray-900"
-            }`}>
-              {scoredBy}
-            </span>
-          </div>
-        )}
-        {shadowScore !== null && shadowScore !== undefined && (
-          <div>
-            <span className="text-gray-600">Shadow Score:</span>
-            <span className="ml-2 font-mono font-semibold">
-              {shadowScore.toFixed(4)}
-            </span>
-          </div>
-        )}
-        {canaryScore !== null && canaryScore !== undefined && (
-          <div>
-            <span className="text-gray-600">Canary Score:</span>
-            <span className="ml-2 font-mono font-semibold">
-              {canaryScore.toFixed(4)}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <span className="text-gray-600 text-sm">Reason:</span>
-        <p className="mt-1 text-gray-800">{reason}</p>
-      </div>
-
-      {segmentReason && (
-        <div className="mt-2">
-          <span className="text-gray-600 text-sm">Segment Reason:</span>
-          <p className="mt-1 text-gray-800">{segmentReason}</p>
         </div>
       )}
 
-      {ruleTriggered && (
-        <div className="mt-2">
-          <span className="text-gray-600 text-sm">Rule Triggered:</span>
-          <span className="ml-2 px-2 py-1 bg-red-100 text-red-800 rounded text-sm font-semibold">
-            {ruleTriggered}
-          </span>
-        </div>
-      )}
+      {/* ---- Reason + Rule ---- */}
+      <div className="px-6 py-4">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+          Reason
+        </p>
+        <p className="text-gray-800">{reason}</p>
+
+        {ruleTriggered && (
+          <div className="mt-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
+              Rule triggered: {ruleTriggered}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ScoreCell({
+  label,
+  value,
+  active,
+}: {
+  label: string
+  value?: number | null
+  active?: boolean
+}) {
+  if (value == null) {
+    return (
+      <div className="text-center">
+        <p className="text-xs text-gray-400">{label}</p>
+        <p className="font-mono text-sm text-gray-300 mt-0.5">—</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`text-center rounded-md px-2 py-1.5 ${active ? "bg-white/60 ring-1 ring-gray-300" : ""}`}>
+      <p className={`text-xs ${active ? "font-semibold text-gray-700" : "text-gray-500"}`}>
+        {label}{active ? " (active)" : ""}
+      </p>
+      <p className="font-mono text-sm font-semibold text-gray-900 mt-0.5">
+        {value.toFixed(4)}
+      </p>
     </div>
   )
 }

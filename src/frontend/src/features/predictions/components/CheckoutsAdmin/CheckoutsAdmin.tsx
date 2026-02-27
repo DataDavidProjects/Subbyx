@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react"
 import { toast } from "sonner"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CheckoutsTable } from "../CheckoutsTable/CheckoutsTable"
 import { FutureCheckout, predictCheckout, loadCheckoutsPaginated, type CheckoutFilters } from "../../dal"
@@ -11,8 +10,6 @@ import { CheckoutResponse } from "../../types"
 import { ResultCard } from "../ResultCard/ResultCard"
 import { FeatureDisplay } from "../FeatureDisplay/FeatureDisplay"
 import { logger } from "@/lib/logger"
-
-const LOG_PREFIX = "[CheckoutsAdmin]"
 
 export interface CheckoutsAdminProps {
   initialData: {
@@ -155,47 +152,41 @@ export function CheckoutsAdmin({ initialData }: CheckoutsAdminProps) {
           />
         </TabsContent>
 
-        <TabsContent value="prediction">
-          <Card>
-            <CardHeader>
-              <CardTitle>Fraud Prediction</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isPredicting ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-                    <p className="text-muted-foreground">Running prediction...</p>
-                  </div>
-                </div>
-              ) : predictionError ? (
-                <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
-                  <p className="text-destructive font-medium">Prediction Failed</p>
-                  <p className="text-destructive/80 text-sm mt-1">{predictionError}</p>
-                </div>
-              ) : prediction ? (
-                <div className="space-y-6">
-                  <ResultCard
-                    decision={prediction.decision}
-                    score={prediction.score}
-                    segment={prediction.segment}
-                    reason={prediction.reason}
-                    ruleTriggered={prediction.rule_triggered}
-                    segmentReason={prediction.segment_reason}
-                    shadowScore={prediction.shadow_score}
-                    canaryScore={prediction.canary_score}
-                    scoredBy={prediction.scored_by}
-                  />
-                  <FeatureDisplay features={prediction.features} />
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No prediction run yet.</p>
-                  <p className="text-sm">Select a checkout and click &quot;Run Prediction&quot; to analyze.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="prediction" className="space-y-4">
+          {isPredicting ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+                <p className="text-muted-foreground">Running prediction...</p>
+              </div>
+            </div>
+          ) : predictionError ? (
+            <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
+              <p className="text-destructive font-medium">Prediction Failed</p>
+              <p className="text-destructive/80 text-sm mt-1">{predictionError}</p>
+            </div>
+          ) : prediction ? (
+            <>
+              <ResultCard
+                decision={prediction.decision}
+                score={prediction.score}
+                segment={prediction.segment}
+                reason={prediction.reason}
+                ruleTriggered={prediction.rule_triggered}
+                segmentReason={prediction.segment_reason}
+                productionScore={prediction.production_score}
+                shadowScore={prediction.shadow_score}
+                canaryScore={prediction.canary_score}
+                scoredBy={prediction.scored_by}
+              />
+              <FeatureDisplay features={prediction.features} />
+            </>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No prediction run yet.</p>
+              <p className="text-sm mt-1">Select a checkout and click &quot;Run Prediction&quot; to analyze.</p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

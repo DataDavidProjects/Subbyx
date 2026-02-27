@@ -56,6 +56,7 @@ export interface CheckoutFilters {
   search?: string
   category?: string
   grade?: string
+  sort_order?: "asc" | "desc"
 }
 
 export async function loadCheckoutsPaginated(
@@ -80,6 +81,9 @@ export async function loadCheckoutsPaginated(
   }
   if (filters?.grade) {
     params.append("grade", filters.grade)
+  }
+  if (filters?.sort_order) {
+    params.append("sort_order", filters.sort_order)
   }
 
   const response = await fetch(

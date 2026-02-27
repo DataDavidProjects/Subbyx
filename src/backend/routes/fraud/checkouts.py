@@ -69,6 +69,7 @@ async def get_checkouts(
     search: Optional[str] = Query(None, description="Search by email, customer ID or SKU"),
     category: Optional[str] = Query(None, description="Filter by category"),
     grade: Optional[str] = Query(None, description="Filter by grade"),
+    sort_order: Optional[str] = Query("desc", description="Sort by date: 'asc' or 'desc'"),
 ) -> dict:
     """
     Get checkouts from future data (test set) with pagination and filtering.
@@ -125,7 +126,7 @@ async def get_checkouts(
             | df["sku"].astype(str).str.lower().str.contains(search_lower, na=False)
         ]
 
-    df = df.sort_values("created", ascending=False)
+    df = df.sort_values("created", ascending=(sort_order == "asc"))
 
     total = len(df)
     logger.debug("found %d checkouts matching filters", total)
