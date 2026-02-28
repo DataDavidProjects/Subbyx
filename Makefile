@@ -4,8 +4,10 @@
 
 .PHONY: help install sync build up down restart logs clean-containers lint format \
         clean-data data-audit data-elaborate data-features data-process \
+        generate-segment-features generate-charge-features \
         redis feast-apply feast-materialize feast-restart feast-status feast-ui feast-verify \
-        dev-backend dev-frontend dev mlflow model-register
+        dev-backend dev-frontend dev mlflow model-register \
+        train train-production train-shadow train-all
 
 # Default dates for materialize
 START ?= 2024-01-01
@@ -64,6 +66,13 @@ help:
 	@echo "  make dev             - Both backend and frontend locally"
 	@echo "  make mlflow          - MLflow only on port 5002"
 	@echo "  make model-register  - Register dummy model in MLflow"
+	@echo ""
+	@echo "Model Training:"
+	@echo "  make train                  - Train model (default: production)"
+	@echo "  make train PROFILE=shadow   - Train shadow model"
+	@echo "  make train-production       - Train production model"
+	@echo "  make train-shadow           - Train shadow model"
+	@echo "  make train-all              - Train both production and shadow"
 
 # Install all project dependencies
 install:
@@ -149,6 +158,14 @@ data-elaborate:
 # Convert CSV to Parquet + type fixes -> data/03-processed/
 data-process:
 	cd scripts && .venv/bin/python 01_csv_to_parquet.py
+
+# Generate segment feature parquets (email, fiscal_code, card_fingerprint history)
+generate-segment-features:
+	cd scripts && uv run python data/generate_segment_features.py
+
+# Generate charge-level features parquet (aggregated by email)
+generate-charge-features:
+	cd scripts && uv run python data/generate_charge_features.py
 
 # Compute aggregated features -> data/04-modeling/
 data-aggregates:
@@ -250,13 +267,23 @@ model-register:
 	cd scripts && VIRTUAL_ENV= uv run python register_dummy_model.py
 	@echo "Done. Model registered as fraud-detector@production"
 
-# Train model on real data (creates training data + trains)
-train: mlflow
-	@echo "Creating training data from data/01-clean..."
-	cd scripts && uv run python create_training_data.py
-	@echo "Training fraud detection model..."
-	cd scripts && uv run python train_simple.py
-	@echo "Done. Model trained and registered as fraud-detector@production"
+# Train model — pass PROFILE=production (default) or PROFILE=shadow
+PROFILE ?= production
+
+train:
+	@echo "Training fraud detection model (profile=$(PROFILE))..."
+	cd scripts && uv run python train_model.py --profile $(PROFILE)
+	@echo "Done. Model trained and registered as fraud-detector@$(PROFILE)"
+
+train-production:
+	$(MAKE) train PROFILE=production
+
+train-shadow:
+	$(MAKE) train PROFILE=shadow
+
+train-all:
+	$(MAKE) train-production
+	$(MAKE) train-shadow
 
 # Create training data only (no training)
 create-training-data:

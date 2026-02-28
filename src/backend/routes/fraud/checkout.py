@@ -37,25 +37,78 @@ def load_blacklist() -> frozenset:
     return frozenset()
 
 
-def determine_segment(customer_id: str, email: str | None = None) -> tuple[str, str]:
-    """Determine segment based on available features from Feast."""
-    from services.fraud.features import get_features
+def determine_segment(
+    customer_id: str,
+    email: str | None = None,
+    fiscal_code: str | None = None,
+    card_fingerprint: str | None = None,
+) -> tuple[str, str]:
+    """Determine segment via multi-identifier history check in Feast.
 
-    features = get_features(customer_id=customer_id)
+    ANY match across email, fiscal_code, or card_fingerprint means RETURNING.
+    """
+    from services.fraud.features.store import store
 
-    has_features = any(v is not None for v in features.values())
+    matches: list[str] = []
 
-    if has_features:
-        logger.debug("customer_id %s has feature data", customer_id)
+    if store is None:
+        logger.warning("Feast store unavailable, defaulting to NEW_CUSTOMER")
         return (
-            fraud_config["segment_keys"]["returning"],
-            "Has historical feature data",
+            fraud_config["segment_keys"]["new_customer"],
+            "Feature store unavailable",
         )
 
-    logger.debug("customer_id %s has no feature data", customer_id)
+    # 1. Email history
+    if email:
+        try:
+            resp = store.get_online_features(
+                features=["email_history:prior_charge_count"],
+                entity_rows=[{"email": email}],
+            )
+            row = resp.to_dict()
+            count = (row.get("prior_charge_count") or [None])[0]
+            if count is not None and count > 0:
+                matches.append(f"email prior_charge_count={count}")
+        except Exception as exc:
+            logger.debug("email history lookup failed: %s", exc)
+
+    # 2. Fiscal code history
+    if fiscal_code:
+        try:
+            resp = store.get_online_features(
+                features=["fiscal_code_history:prior_customer_count"],
+                entity_rows=[{"fiscal_code": fiscal_code}],
+            )
+            row = resp.to_dict()
+            count = (row.get("prior_customer_count") or [None])[0]
+            if count is not None and count > 1:
+                matches.append(f"fiscal_code prior_customer_count={count}")
+        except Exception as exc:
+            logger.debug("fiscal_code history lookup failed: %s", exc)
+
+    # 3. Card fingerprint history
+    if card_fingerprint:
+        try:
+            resp = store.get_online_features(
+                features=["card_history:prior_card_charge_count"],
+                entity_rows=[{"card_fingerprint": card_fingerprint}],
+            )
+            row = resp.to_dict()
+            count = (row.get("prior_card_charge_count") or [None])[0]
+            if count is not None and count > 0:
+                matches.append(f"card_fingerprint prior_card_charge_count={count}")
+        except Exception as exc:
+            logger.debug("card history lookup failed: %s", exc)
+
+    if matches:
+        reason = "Returning: " + ", ".join(matches)
+        logger.debug("customer_id %s -> RETURNING (%s)", customer_id, reason)
+        return fraud_config["segment_keys"]["returning"], reason
+
+    logger.debug("customer_id %s -> NEW_CUSTOMER (no identifier history)", customer_id)
     return (
         fraud_config["segment_keys"]["new_customer"],
-        "No historical data available",
+        "No historical data for any identifier",
     )
 
 
@@ -106,7 +159,12 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
 
     # 1. Segment determination (always first — rules can be segment-aware)
     logger.info("[BACKEND] Step 1: Determining segment for customer_id=%s", request.customer_id)
-    segment, segment_reason = determine_segment(request.customer_id, request.email)
+    segment, segment_reason = determine_segment(
+        request.customer_id,
+        request.email,
+        request.fiscal_code,
+        request.card_fingerprint,
+    )
     logger.info(
         "[BACKEND] Step 1 complete: segment=%s, reason=%s",
         segment,

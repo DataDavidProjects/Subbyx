@@ -6,10 +6,8 @@ export {
   type PaginatedCheckouts,
   type CheckoutFilters,
 } from "./actions"
-export { 
-  predictCheckoutClient, 
+export {
+  predictCheckoutClient,
   checkBlacklistClient,
-  predictBatchClient,
   type Result,
-  type BatchPredictionResult 
 } from "./client"

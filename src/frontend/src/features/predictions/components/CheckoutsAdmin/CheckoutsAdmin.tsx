@@ -89,6 +89,7 @@ export function CheckoutsAdmin({ initialData }: CheckoutsAdminProps) {
         has_vetrino: checkout.has_vetrino,
         has_protezione_totale: checkout.has_protezione_totale,
         has_protezione_furto: checkout.has_protezione_furto,
+        card_fingerprint: checkout.card_fingerprint,
       }
 
       const result = await predictCheckout(checkout.customer_id, checkout.email || "", checkoutData)

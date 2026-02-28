@@ -8,6 +8,7 @@ export interface CheckoutData {
   has_protezione_furto: boolean
   store_id: string
   sku: string
+  card_fingerprint?: string | null
 }
 
 export interface CheckoutResponse {
@@ -24,22 +25,4 @@ export interface CheckoutResponse {
   scored_by: string | null
 }
 
-export interface BatchResponse {
-  total: number
-  blocked: number
-  approved: number
-  output_path: string
-}
-
-export interface PredictionResult {
-  customer_id: string
-  email: string
-  segment: string | null
-  score: number | null
-  decision: string
-  reason: string
-  shadow_score: number | null
-  canary_score: number | null
-  scored_by: string | null
-}
 

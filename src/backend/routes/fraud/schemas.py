@@ -3,6 +3,8 @@ from pydantic import BaseModel
 
 class SegmentDetermineRequest(BaseModel):
     email: str
+    fiscal_code: str | None = None
+    card_fingerprint: str | None = None
 
 
 class SegmentDetermineResponse(BaseModel):
@@ -67,6 +69,7 @@ class CheckoutRequest(BaseModel):
     birth_date: str | None = None
     birth_province: str | None = None
     birth_country: str | None = None
+    card_fingerprint: str | None = None
 
 
 class CheckoutResponse(BaseModel):

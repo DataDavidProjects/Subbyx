@@ -21,6 +21,7 @@ export interface FutureCheckout {
   mode: string
   status: string
   created: string
+  card_fingerprint: string | null
 }
 
 export interface PaginatedCheckouts {
@@ -129,10 +130,13 @@ export async function predictCheckout(
     category: checkoutData.category
   }, "[DAL] predictCheckout: START - building request")
 
-  const requestBody = {
+  const requestBody: Record<string, unknown> = {
     customer_id: customerId,
     email,
     checkout_data: checkoutData,
+  }
+  if (checkoutData.card_fingerprint) {
+    requestBody.card_fingerprint = checkoutData.card_fingerprint
   }
   
   logger.debug({ requestBody }, "[DAL] predictCheckout: request body prepared")

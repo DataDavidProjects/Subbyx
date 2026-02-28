@@ -117,6 +117,20 @@ async def get_checkouts(
     df["customer_id"] = df["customer_id"].astype(str)
     df["email"] = df["customer_id"].map(customers_map)
 
+    # Join card_fingerprint from charges via payment_intent
+    charges_path = data_path / "charges.csv"
+    if charges_path.exists():
+        charges_df = pd.read_csv(charges_path, index_col=0)
+        pi_to_card = dict(
+            zip(
+                charges_df["payment_intent"].astype(str),
+                charges_df["card_fingerprint"].astype(str),
+            )
+        )
+        df["card_fingerprint"] = df["payment_intent"].astype(str).map(pi_to_card)
+    else:
+        df["card_fingerprint"] = None
+
     search_lower = search.lower().strip() if search else None
 
     if search_lower:

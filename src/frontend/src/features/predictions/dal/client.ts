@@ -1,4 +1,4 @@
-import { CheckoutData, CheckoutResponse, PredictionResult } from "../types"
+import { CheckoutData, CheckoutResponse } from "../types"
 import { logger } from "@/lib/logger"
 
 const API_URL = typeof window !== "undefined" 
@@ -9,13 +9,6 @@ export type Result<T> = {
   success: boolean
   data?: T
   error?: string
-}
-
-export interface BatchPredictionResult {
-  total: number
-  blocked: number
-  approved: number
-  results?: PredictionResult[]
 }
 
 export async function predictCheckoutClient(
@@ -74,27 +67,3 @@ export async function checkBlacklistClient(
   }
 }
 
-export async function predictBatchClient(file: File): Promise<Result<BatchPredictionResult>> {
-  try {
-    const formData = new FormData()
-    formData.append("file", file)
-
-    const response = await fetch(`${API_URL}/fraud/v1/batch/predict-file`, {
-      method: "POST",
-      body: formData,
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      return { success: false, error: errorData.detail || `Error: ${response.statusText}` }
-    }
-
-    const data: BatchPredictionResult = await response.json()
-    return { success: true, data }
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : "Unknown error" 
-    }
-  }
-}

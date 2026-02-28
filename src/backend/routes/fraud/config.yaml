@@ -12,11 +12,11 @@ rules:
 segments:
   NEW_CUSTOMER:
     description: First time customer with no prior checkout history
-    threshold: 0.005
+    threshold: 0.3
     default_threshold: 0.5
   RETURNING:
     description: Returning customer with at least one prior checkout
-    threshold: 0.23
+    threshold: 0.6
     default_threshold: 0.8
 
 # Segment lookup keys
