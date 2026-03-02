@@ -162,3 +162,80 @@ class TestRulesTrigger:
         assert response.score == 0.1
         assert response.decision in ["APPROVE", "BLOCK"]
         mock_score_models.assert_called_once()
+
+    @patch("services.fraud.context.resolve_checkout")
+    @patch("services.fraud.inference.model.score_models")
+    @patch("services.fraud.features.get_features")
+    @patch("routes.fraud.checkout.load_checkouts")
+    def test_payment_failure_rule_trigger(self, mock_load_checkouts, mock_get_features, mock_score_models, mock_resolve, mock_checkout_context, empty_checkouts_df):
+        """Rule: High payment failure rate should trigger BLOCK before model scoring."""
+        from routes.fraud.checkout import fraud_checkout
+
+        # Mock resolve_checkout to return a RETURNING customer context
+        # For a RETURNING customer, we need prior completed checkouts
+        completed_checkouts_df = pd.DataFrame({
+            "customer": ["test_customer"],
+            "status": ["complete"],
+            "mode": ["subscription"],
+            "created": ["2024-01-01T00:00:00"]
+        })
+
+        # Mock features with high failure rate (above 80% threshold with 15+ attempts)
+        high_failure_features = {
+            "charge_stats_features__failure_rate": 0.85,
+            "charge_stats_features__n_charges": 20.0,
+            "payment_intent_stats_features__failure_rate": 0.0,
+            "payment_intent_stats_features__n_payment_intents": 0.0,
+        }
+
+        mock_resolve.return_value = mock_checkout_context
+        mock_load_checkouts.return_value = completed_checkouts_df
+        mock_get_features.return_value = high_failure_features
+
+        request = CheckoutRequest(checkout_id="test_checkout")
+        response = fraud_checkout(request)
+
+        assert response.decision == "BLOCK"
+        assert response.rule_triggered == "payment_failure"
+        assert "failure rate" in response.reason.lower()
+        # Ensure model was NOT called - rule blocks before model scoring
+        mock_score_models.assert_not_called()
+
+    @patch("services.fraud.context.resolve_checkout")
+    @patch("services.fraud.inference.model.score_models")
+    @patch("services.fraud.features.get_features")
+    @patch("routes.fraud.checkout.load_checkouts")
+    def test_payment_failure_rule_trigger(self, mock_load_checkouts, mock_get_features, mock_score_models, mock_resolve, mock_checkout_context, empty_checkouts_df):
+        """Rule: High payment failure rate should trigger BLOCK before model scoring."""
+        from routes.fraud.checkout import fraud_checkout
+
+        # Create a returning customer (has prior completed checkout)
+        returning_checkouts = pd.DataFrame({
+            "customer": ["test_customer"],
+            "status": ["complete"],
+            "mode": ["payment"],
+            "created": ["2024-01-01T00:00:00"]
+        })
+
+        ctx = replace(mock_checkout_context)
+        mock_resolve.return_value = ctx
+        mock_load_checkouts.return_value = returning_checkouts
+
+        # Mock features with high failure rate (above 0.80 threshold with >=15 attempts)
+        mock_get_features.return_value = {
+            "charge_stats_features__failure_rate": 0.85,
+            "charge_stats_features__n_charges": 20.0,
+            "payment_intent_stats_features__failure_rate": 0.0,
+            "payment_intent_stats_features__n_payment_intents": 0.0,
+        }
+
+        request = CheckoutRequest(checkout_id="test_checkout")
+        response = fraud_checkout(request)
+
+        assert response.decision == "BLOCK"
+        assert response.rule_triggered == "payment_failure"
+        assert "failure rate" in response.reason.lower()
+        # Ensure model was NOT called (rule blocks before scoring)
+        mock_score_models.assert_not_called()
+        # Ensure score is None (model was not called)
+        assert response.score is None

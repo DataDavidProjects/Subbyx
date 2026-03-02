@@ -150,16 +150,17 @@ class TestOnlineFeatureRetrieval:
 
         from services.fraud.features.store import store
 
+        # Use failure_rate — it's in the production feature service
         historical = store.get_historical_features(
             entity_df=entity_df,
-            features=["charge_stats_features:n_charges"],
+            features=["charge_stats_features:failure_rate"],
             full_feature_names=True,
         ).to_df()
 
         online = get_features(email=email)
 
-        historical_value = historical["charge_stats_features__n_charges"].iloc[0]
-        online_value = online.get("charge_stats_features__n_charges")
+        historical_value = historical["charge_stats_features__failure_rate"].iloc[0]
+        online_value = online.get("charge_stats_features__failure_rate")
 
         # Historical (at time after all data) should equal Online (latest)
         assert historical_value == online_value, (

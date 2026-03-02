@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_selection import mutual_info_classif
-from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 logger = logging.getLogger(__name__)
 
@@ -110,19 +109,50 @@ class AddMissingIndicators(BaseEstimator, TransformerMixin):
     def get_indicators(self) -> dict[str, list[str]]:
         return self._resolved_groups
 
+    # View-prefix mapping used at inference time.  Unlike _DEFAULT_GROUPS
+    # (which references specific probe columns that might not be served),
+    # this scans every feature in the dict whose key starts with the given
+    # prefixes — so it works regardless of which features were selected.
+    _VIEW_PREFIXES: dict[str, list[str]] = {
+        "charge_features__missing": [
+            "charge_features__",
+            "charge_stats_features__",
+        ],
+        "pi_features__missing": [
+            "payment_intent_features__",
+            "payment_intent_stats_features__",
+        ],
+        "address_features__missing": [
+            "address_features__",
+        ],
+    }
+
     @staticmethod
     def enrich_dict(features: dict) -> dict:
         """Add missing-indicator flags to a feature dict (inference time).
 
-        Uses the default probe groups so the logic stays in sync with training.
-        A probe group is "missing" when **all** its probe columns are ``None``
-        or ``NaN`` in *features*.
+        Scans all keys in *features* that match each view's prefixes.
+        The indicator is ``1`` when **every** matching feature is ``None``
+        or ``NaN`` (i.e. the entire view is absent for this entity).
+
+        This avoids depending on specific probe column names which may not
+        be present in the production feature service.
         """
-        for indicator, probes in AddMissingIndicators._DEFAULT_GROUPS.items():
+        for indicator, prefixes in AddMissingIndicators._VIEW_PREFIXES.items():
+            matching = [
+                k for k in features
+                if any(k.startswith(p) for p in prefixes)
+                and k != indicator  # don't count the indicator itself
+            ]
+            if not matching:
+                # No features from this view in the dict — can't determine;
+                # default to 0 (not missing) to avoid false positives.
+                features[indicator] = 0
+                continue
             all_missing = all(
-                features.get(col) is None
-                or (isinstance(features.get(col), float) and np.isnan(features[col]))
-                for col in probes
+                features.get(k) is None
+                or (isinstance(features.get(k), float) and np.isnan(features[k]))
+                for k in matching
             )
             features[indicator] = 1 if all_missing else 0
         return features
@@ -205,6 +235,8 @@ class RemoveHighVIFFeatures(BaseEstimator, TransformerMixin):
     def _compute_vif(self, X: pd.DataFrame) -> pd.DataFrame:
         vif_data = pd.DataFrame()
         vif_data["feature"] = X.columns
+        from statsmodels.stats.outliers_influence import variance_inflation_factor
+
         vif_data["VIF"] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
         return vif_data.sort_values("VIF", ascending=False)
 

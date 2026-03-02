@@ -35,6 +35,25 @@ def generate() -> None:
     else:
         df["created"] = df["created"].dt.tz_convert("UTC")
 
+    # Fix match-score outliers: some records have scores stored as
+    # score × 1000 (e.g. 875 instead of 0.875) due to upstream data bug.
+    # Valid similarity scores are in [0, 1]; rescale any value > 1.
+    _MATCH_SCORE_COLS = [
+        "doc_name_email_match_score",
+        "email_emails_match_score",
+        "account_card_names_match_score",
+        "card_owner_names_card_owner_names_match_score",
+    ]
+    for col in _MATCH_SCORE_COLS:
+        if col in df.columns:
+            mask = df[col] > 1.0
+            n_bad = mask.sum()
+            if n_bad > 0:
+                df.loc[mask, col] = df.loc[mask, col] / 1000.0
+                logger.warning(
+                    "Rescaled %d outlier values in %s (were ×1000)", n_bad, col
+                )
+
     # 1. Save Base Customers Parquet
     logger.info("Renaming 'id' to 'customer_id' for Feast entity...")
     df = df.rename(columns={"id": "customer_id"})

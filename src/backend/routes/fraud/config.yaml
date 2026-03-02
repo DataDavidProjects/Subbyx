@@ -7,6 +7,8 @@ rules:
     enabled: true
   stripe_risk:
     enabled: true
+  payment_failure:
+    enabled: true
 
 # Segment configuration with thresholds
 segments:

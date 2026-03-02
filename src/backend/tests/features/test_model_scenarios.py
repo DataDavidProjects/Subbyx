@@ -13,28 +13,57 @@ class TestModelScoringLogic:
     """
 
     def test_model_discriminates_fraud_vs_clean(self) -> None:
-        """Model should score fraud higher than clean when using training mean values."""
+        """Model should score fraud higher than clean when using realistic feature values.
+
+        Sets feature values based on what fraud vs clean profiles look like:
+        - Fraud: high geo fraud rates, low success rate, high failure rate,
+          low identity-match scores, no payment history (missing indicator=1).
+        - Clean: zero geo fraud, high success rate, high identity-match scores.
+        """
         cols = production_model.feature_columns
 
+        # --- Fraud profile: risky geo, poor payment history, weak identity ---
         fraud_features = {col: 0.0 for col in cols}
-        fraud_features["payment_intent_stats_features__success_rate"] = 0.472
-        fraud_features["payment_intent_stats_features__n_succeeded"] = 1.791
-        fraud_features["charge_features__outcome_risk_score"] = 1.458
-        fraud_features["payment_intent_features__subscription_value"] = 21.471
-        fraud_features["charge_stats_features__failure_rate"] = 0.205
-        fraud_features["payment_intent_features__amount"] = 0.4
-        fraud_features["payment_intent_stats_features__n_payment_intents"] = 2.646
-        fraud_features["checkout_features__subscription_value"] = 32.706
+        # Geo-velocity: region with high recent fraud activity
+        for col in cols:
+            if "fraud_rate" in col:
+                fraud_features[col] = 0.5
+            elif "n_frauds" in col:
+                fraud_features[col] = 5.0
+            elif "n_requests" in col:
+                fraud_features[col] = 10.0
+        # Payment: low success, high failure
+        fraud_features.update({k: v for k, v in {
+            "payment_intent_stats_features__success_rate": 0.1,
+            "payment_intent_stats_features__failure_rate": 0.6,
+            "payment_intent_stats_features__n_succeeded": 0,
+            "payment_intent_stats_features__n_payment_intents": 5,
+            "charge_stats_features__failure_rate": 0.5,
+            "payment_intent_features__amount": 200,
+            "subscription_value": 200,
+            "payment_intent_features__subscription_value": 200,
+            # Identity: low match scores
+            "customer_features__doc_name_email_match_score": 0.1,
+            "customer_features__email_emails_match_score": 0.1,
+            "pi_features__missing": 0,
+        }.items() if k in cols})
 
+        # --- Clean profile: safe geo, good payment history, strong identity ---
         clean_features = {col: 0.0 for col in cols}
-        clean_features["payment_intent_stats_features__success_rate"] = 0.148
-        clean_features["payment_intent_stats_features__n_succeeded"] = 0.382
-        clean_features["charge_features__outcome_risk_score"] = 0.420
-        clean_features["payment_intent_features__subscription_value"] = 7.348
-        clean_features["charge_stats_features__failure_rate"] = 0.170
-        clean_features["payment_intent_features__amount"] = 0.2
-        clean_features["payment_intent_stats_features__n_payment_intents"] = 1.145
-        clean_features["checkout_features__subscription_value"] = 18.470
+        clean_features.update({k: v for k, v in {
+            "payment_intent_stats_features__success_rate": 0.95,
+            "payment_intent_stats_features__failure_rate": 0.0,
+            "payment_intent_stats_features__n_succeeded": 10,
+            "payment_intent_stats_features__n_payment_intents": 10,
+            "charge_stats_features__failure_rate": 0.0,
+            "payment_intent_features__amount": 30,
+            "subscription_value": 30,
+            "payment_intent_features__subscription_value": 30,
+            # Identity: high match scores
+            "customer_features__doc_name_email_match_score": 0.95,
+            "customer_features__email_emails_match_score": 0.95,
+            "pi_features__missing": 0,
+        }.items() if k in cols})
 
         fraud_score = production_model.predict(fraud_features)
         clean_score = production_model.predict(clean_features)

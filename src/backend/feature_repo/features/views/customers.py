@@ -73,6 +73,22 @@ customer_features = FeatureView(
                 "description": "Similarity score between the Subbyx account name and the cardholder name (0.0–1.0).",
             },
         ),
+        Field(
+            name="high_end_count",
+            dtype=Float64,
+            tags={
+                "label": "High-End Device Count",
+                "description": "Number of high-end devices on file for this customer.",
+            },
+        ),
+        Field(
+            name="high_end_rate",
+            dtype=Float64,
+            tags={
+                "label": "High-End Device Rate",
+                "description": "Fraction of transactions associated with high-end devices (0.0–1.0).",
+            },
+        ),
     ],
     source=customer_features_source,
 )

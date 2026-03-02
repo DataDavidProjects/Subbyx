@@ -249,6 +249,26 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
         fiscal_code=ctx.fiscal_code,
     )
 
+    # 3a. Payment failure rate check (pre-model rule for RETURNING customers)
+    # Uses the features fetched in Step 3, but runs BEFORE model scoring
+    if segment == "RETURNING":
+        from routes.fraud.rules.payment_failure import check_payment_failure
+
+        pf_triggered, pf_reason = check_payment_failure(feast_features, segment)
+        if pf_triggered:
+            logger.info(
+                "[BACKEND] Step 3a: PAYMENT_FAILURE rule triggered (segment=%s)",
+                segment,
+            )
+            return CheckoutResponse(
+                decision="BLOCK",
+                reason=pf_reason,
+                rule_triggered="payment_failure",
+                score=None,
+                segment=segment,
+                segment_reason=segment_reason,
+            )
+
     # 4. Merge request features and align with model prefixes
     request_features = extract_request_features(ctx)
     all_features = {**feast_features}
@@ -263,6 +283,17 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
     for req_key, feat_key in mapping.items():
         if req_key in request_features:
             all_features[feat_key] = request_features[req_key]
+
+    # Fill null Feast features with request-time values when available.
+    # payment_intent_features__subscription_value is often null in the
+    # online store (PI not yet created), but we know the value from the
+    # checkout request — use it to avoid imputing -1.
+    _feast_fallbacks = {
+        "payment_intent_features__subscription_value": "subscription_value",
+    }
+    for feast_key, req_key in _feast_fallbacks.items():
+        if all_features.get(feast_key) is None and req_key in request_features:
+            all_features[feast_key] = request_features[req_key]
 
     # Keep original request features for fallback/selection
     all_features.update(request_features)

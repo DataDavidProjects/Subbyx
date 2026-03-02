@@ -136,6 +136,17 @@ def main() -> None:
     # 3. email_domain
     entity_df["email_domain"] = entity_df["email"].str.split("@").str[-1].str.lower().fillna("")
 
+    # 4. Category risk features (must match extract_request_features logic)
+    cat_lower = entity_df["category"].fillna("").str.strip().str.lower()
+    entity_df["is_storage_variant"] = cat_lower.str.contains("gb|tb|cpu", regex=True).astype(int)
+    entity_df["is_smartphone_or_watch"] = cat_lower.str.contains("smartphone|smartwatch", regex=True).astype(int)
+    entity_df["is_high_risk_category"] = (
+        (entity_df["is_storage_variant"] == 1) | cat_lower.str.contains("smartphone|smartwatch", regex=True)
+    ).astype(int)
+    entity_df["category_risk_tier"] = "low"
+    entity_df.loc[entity_df["is_smartphone_or_watch"] == 1, "category_risk_tier"] = "medium"
+    entity_df.loc[entity_df["is_storage_variant"] == 1, "category_risk_tier"] = "high"
+
     # Keep entity keys + request feature columns needed for train/serve parity
     request_feature_cols = list(REQUEST_FEATURE_SCHEMA.keys())
     entity_cols = [
@@ -212,16 +223,20 @@ def main() -> None:
         feature_cols.extend(indicator_cols)
         logger.info("Added missing indicators: %s", indicator_cols)
 
-    # -- Fill NULLs with defaults (no prior history) --
+    # -- Handle NULLs --
+    # IMPORTANT: Do NOT fill numeric NaNs with 0 — LightGBM handles NaN
+    # natively by learning the optimal NaN branch at each split.  Filling
+    # with 0 conflates "no data" with "actual zero" (e.g. failure_rate=0
+    # means both "no charges" and "zero failures"), destroying signal.
+    # This also aligns with inference where missing features stay NaN.
     for col in feature_cols:
         if col in indicator_cols:
-            continue  # indicators are already 0/1, no fill needed
+            continue  # indicators are already 0/1
         null_count = training_df[col].isna().sum()
         if null_count > 0:
-            # Type-safe fill: use 0 for numeric, "" for objects/strings
             if pd.api.types.is_numeric_dtype(training_df[col]):
-                logger.info("Filling %d NULLs in %s with 0", null_count, col)
-                training_df[col] = training_df[col].fillna(0)
+                # Keep NaN — LightGBM learns optimal NaN routing per split
+                logger.info("Keeping %d NaNs in %s (LightGBM native handling)", null_count, col)
             else:
                 logger.info('Filling %d NULLs in %s with ""', null_count, col)
                 training_df[col] = training_df[col].fillna("")

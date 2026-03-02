@@ -71,7 +71,7 @@ LGBM_PARAMS = {
     "boosting_type": "gbdt",
     "learning_rate": 0.05,
     "n_estimators": 300,
-    "max_depth": 3,
+    "max_depth": 10,
     "min_child_samples": 30,
     "reg_alpha": 0.1,
     "reg_lambda": 1.0,

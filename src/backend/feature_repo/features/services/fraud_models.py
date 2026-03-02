@@ -1,23 +1,12 @@
-"""
-Fraud model feature services.
-
-Defines three Feast FeatureServices:
-  - train_model_service  : ALL features (used by create_training_data.py for PIT joins)
-  - fraud_model_production : selected features (loaded from selected_features.yaml)
-  - fraud_model_shadow     : identity-focused challenger (fixed feature set)
-
-Data flow:
-  feature_selection.py  -->  selected_features.yaml  -->  PRODUCTION_FEATURES
-                                                      -->  train_model.py
-                                                      -->  fraud_model_production (Feast serving)
-"""
-
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import yaml
 from feast import FeatureService, FeatureView
+
+logger = logging.getLogger(__name__)
 
 from features.views.charges import charge_features, charge_stats_features
 from features.views.checkouts import checkout_features
@@ -141,15 +130,24 @@ def _select_from_views(
     feature_names: list[str],
     views: list[FeatureView],
 ) -> list[FeatureView]:
-    """Route a flat feature list (view__field format) to per-view Feast projections."""
+    """Route a flat feature list (view__field format) to per-view Feast projections.
+
+    Features that don't belong to any Feast view (e.g. missing indicators,
+    request-time features) are silently skipped — they are provided at
+    inference/training time through other means.
+    """
     view_map = {fv.name: fv for fv in views}
+    # Build a set of valid (view_name, field_name) pairs for fast lookup.
+    view_fields: dict[str, set[str]] = {
+        fv.name: {field.name for field in fv.schema} for fv in views
+    }
     field_to_view = {field.name: fv for fv in views for field in fv.schema}
 
     per_view: dict[str, list[str]] = {}
     for name in feature_names:
         if "__" in name:
             view_name, field_name = name.split("__", 1)
-            if view_name in view_map:
+            if view_name in view_map and field_name in view_fields[view_name]:
                 per_view.setdefault(view_name, []).append(field_name)
                 continue
 
@@ -157,12 +155,15 @@ def _select_from_views(
             fv = field_to_view[name]
             per_view.setdefault(fv.name, []).append(name)
         else:
-            raise KeyError(
-                f"Feature '{name}' not found in any FeatureView. "
-                f"Available views: {list(view_map.keys())}"
-            )
+            # Non-Feast feature (missing indicator, request feature, etc.)
+            # — provided at inference/training time, not from Feast.
+            logger.debug("Skipping non-Feast feature '%s' in view projection", name)
 
-    return [view_map[v_name][fields] for v_name, fields in per_view.items()]
+    # Deduplicate fields per view — an unprefixed feature name like
+    # "subscription_value" can match via field_to_view AND via the
+    # explicit "payment_intent_features__subscription_value" entry,
+    # causing a FeatureNameCollisionError in Feast.
+    return [view_map[v_name][list(dict.fromkeys(fields))] for v_name, fields in per_view.items()]
 
 
 # =============================================================================
