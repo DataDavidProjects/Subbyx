@@ -92,7 +92,7 @@ export function CheckoutsAdmin({ initialData }: CheckoutsAdminProps) {
         card_fingerprint: checkout.card_fingerprint,
       }
 
-      const result = await predictCheckout(checkout.customer_id, checkout.email || "", checkoutData)
+      const result = await predictCheckout(checkout.id, checkout.customer_id, checkout.email || "", checkoutData)
 
       setPrediction(result)
       setActiveTab("prediction")
@@ -177,8 +177,8 @@ export function CheckoutsAdmin({ initialData }: CheckoutsAdminProps) {
                 segmentReason={prediction.segment_reason}
                 productionScore={prediction.production_score}
                 shadowScore={prediction.shadow_score}
-                canaryScore={prediction.canary_score}
                 scoredBy={prediction.scored_by}
+                isFraudTruth={selectedCheckout?.is_fraud}
               />
               <FeatureDisplay features={prediction.features} />
             </>

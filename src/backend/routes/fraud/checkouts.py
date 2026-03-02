@@ -38,11 +38,12 @@ def get_data_path() -> Path:
     return data_path
 
 
-def load_customers_map() -> dict[str, str]:
+def load_customers_map() -> dict[str, dict]:
     """
-    Load customer_id -> email mapping from data directory.
+    Load customer_id -> {email, is_fraud} mapping from data directory.
     """
-    customers_map: dict[str, str] = {}
+    customers_map: dict[str, dict] = {}
+    threshold = training_config.get("modeling", {}).get("fraud_threshold_days", 15)
 
     data_path = get_data_path()
     customers_file = data_path / "customers.csv"
@@ -51,11 +52,16 @@ def load_customers_map() -> dict[str, str]:
         for _, row in df.iterrows():
             cid = str(row.get("id", ""))
             email = str(row.get("email", ""))
-            if cid and email and email != "nan":
-                customers_map[cid] = email
-        logger.debug("loaded %d customers from data", len(customers_map))
+            dunning_days = row.get("dunning_days", 0)
+            is_fraud = bool(dunning_days > threshold)
 
-    logger.debug("total customers map: %d entries", len(customers_map))
+            if cid:
+                customers_map[cid] = {
+                    "email": email if email != "nan" else None,
+                    "is_fraud": is_fraud,
+                }
+        logger.debug("loaded %d customers details from data", len(customers_map))
+
     return customers_map
 
 
@@ -70,13 +76,14 @@ async def get_checkouts(
     category: Optional[str] = Query(None, description="Filter by category"),
     grade: Optional[str] = Query(None, description="Filter by grade"),
     sort_order: Optional[str] = Query("desc", description="Sort by date: 'asc' or 'desc'"),
+    is_fraud: Optional[bool] = Query(None, description="Filter by ground truth status"),
 ) -> dict:
     """
     Get checkouts from future data (test set) with pagination and filtering.
     """
     logger.debug(
         "get_checkouts called: page=%d, page_size=%d, mode=%s, status=%s, "
-        "search=%s, category=%s, grade=%s, limit=%s",
+        "search=%s, category=%s, grade=%s, is_fraud=%s, limit=%s",
         page,
         page_size,
         mode,
@@ -84,6 +91,7 @@ async def get_checkouts(
         search,
         category,
         grade,
+        is_fraud,
         limit,
     )
 
@@ -113,9 +121,14 @@ async def get_checkouts(
     if grade:
         df = df[df["grade"] == grade]
 
-    customers_map = load_customers_map()
+    customers_data = load_customers_map()
     df["customer_id"] = df["customer_id"].astype(str)
-    df["email"] = df["customer_id"].map(customers_map)
+
+    # Map email and label from customer data
+    df["email"] = df["customer_id"].apply(lambda x: customers_data.get(x, {}).get("email"))
+    df["is_fraud"] = df["customer_id"].apply(
+        lambda x: customers_data.get(x, {}).get("is_fraud", False)
+    )
 
     # Join card_fingerprint from charges via payment_intent
     charges_path = data_path / "charges.csv"
@@ -139,6 +152,9 @@ async def get_checkouts(
             | df["customer_id"].str.lower().str.contains(search_lower, na=False)
             | df["sku"].astype(str).str.lower().str.contains(search_lower, na=False)
         ]
+
+    if is_fraud is not None:
+        df = df[df["is_fraud"] == is_fraud]
 
     df = df.sort_values("created", ascending=(sort_order == "asc"))
 

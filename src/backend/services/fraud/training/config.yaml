@@ -10,9 +10,9 @@ modeling:
 
 # Time-based split dates (used by create_training_data.py and checkouts API)
 dates:
-  train_end: "2024-09-01"
-  val_end: "2024-10-01"
-  test_start: "2024-09-01"
+  train_end: "2024-06-01"
+  val_end: "2024-08-15"
+  test_start: "2024-08-15"
   test_end: "2024-10-31"
 
 # MLflow configuration

@@ -7,6 +7,6 @@ export interface ResultCardProps {
   segmentReason?: string | null
   productionScore?: number | null
   shadowScore?: number | null
-  canaryScore?: number | null
   scoredBy?: string | null
+  isFraudTruth?: boolean
 }

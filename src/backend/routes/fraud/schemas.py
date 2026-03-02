@@ -2,9 +2,11 @@ from pydantic import BaseModel
 
 
 class SegmentDetermineRequest(BaseModel):
+    customer_id: str
     email: str
     fiscal_code: str | None = None
     card_fingerprint: str | None = None
+    timestamp: str | None = None
 
 
 class SegmentDetermineResponse(BaseModel):
@@ -23,11 +25,13 @@ class FeaturesGetResponse(BaseModel):
     features: dict
 
 
-class BlacklistCheckRequest(BaseModel):
+class RuleCheckRequest(BaseModel):
     email: str
+    fiscal_code: str | None = None
+    timestamp: str | None = None  # ISO format for PIT filtering
 
 
-class BlacklistCheckResponse(BaseModel):
+class RuleCheckResponse(BaseModel):
     triggered: bool
     rule: str
     reason: str
@@ -41,7 +45,6 @@ class ScoreResponse(BaseModel):
     score: float
     production_score: float | None = None
     shadow_score: float | None = None
-    canary_score: float | None = None
     scored_by: str | None = None
 
 
@@ -56,9 +59,10 @@ class DecisionResponse(BaseModel):
 
 
 class CheckoutRequest(BaseModel):
-    customer_id: str
-    email: str
-    checkout_data: dict
+    checkout_id: str
+    customer_id: str | None = None
+    email: str | None = None
+    checkout_data: dict | None = None
     timestamp: str | None = None
     customer_name: str | None = None
     document_name: str | None = None
@@ -82,5 +86,4 @@ class CheckoutResponse(BaseModel):
     features: dict | None = None
     production_score: float | None = None
     shadow_score: float | None = None
-    canary_score: float | None = None
     scored_by: str | None = None

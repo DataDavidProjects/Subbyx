@@ -22,6 +22,7 @@ export interface FutureCheckout {
   status: string
   created: string
   card_fingerprint: string | null
+  is_fraud: boolean
 }
 
 export interface PaginatedCheckouts {
@@ -58,6 +59,7 @@ export interface CheckoutFilters {
   category?: string
   grade?: string
   sort_order?: "asc" | "desc"
+  is_fraud?: boolean
 }
 
 export async function loadCheckoutsPaginated(
@@ -85,6 +87,9 @@ export async function loadCheckoutsPaginated(
   }
   if (filters?.sort_order) {
     params.append("sort_order", filters.sort_order)
+  }
+  if (filters?.is_fraud !== undefined) {
+    params.append("is_fraud", filters.is_fraud.toString())
   }
 
   const response = await fetch(
@@ -118,6 +123,7 @@ export async function loadCheckoutsPaginated(
 }
 
 export async function predictCheckout(
+  checkoutId: string,
   customerId: string,
   email: string,
   checkoutData: CheckoutData
@@ -131,6 +137,7 @@ export async function predictCheckout(
   }, "[DAL] predictCheckout: START - building request")
 
   const requestBody: Record<string, unknown> = {
+    checkout_id: checkoutId,
     customer_id: customerId,
     email,
     checkout_data: checkoutData,

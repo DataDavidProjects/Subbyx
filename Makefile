@@ -4,10 +4,14 @@
 
 .PHONY: help install sync build up down restart logs clean-containers lint format \
         clean-data data-audit data-elaborate data-features data-process \
-        generate-segment-features generate-charge-features \
-        redis feast-apply feast-materialize feast-restart feast-status feast-ui feast-verify \
+        generate-customer-features generate-charge-features \
+        generate-payment-intent-features generate-checkout-features \
+        generate-address-features generate-store-features \
+        generate-features \
+        redis feast-apply feast-materialize feast-restart feast-reset feast-status feast-ui feast-verify \
         dev-backend dev-frontend dev mlflow model-register \
-        train train-production train-shadow train-all
+        train train-production train-shadow train-all \
+        test
 
 # Default dates for materialize
 START ?= 2024-01-01
@@ -27,6 +31,7 @@ help:
 	@echo "  make install          - Install all dependencies (backend + scripts + frontend)"
 	@echo "  make sync             - Re-sync Python deps (backend + scripts)"
 	@echo "  make build            - Build Docker images"
+	@echo "  make test             - Run backend tests"
 	@echo ""
 	@echo "Docker (all services):"
 	@echo "  make up              - Start all services"
@@ -41,6 +46,7 @@ help:
 	@echo "  make data-audit      - Run data quality audit"
 	@echo "  make data-elaborate  - Split data into train/test"
 	@echo "  make data-process    - Convert CSV to Parquet"
+	@echo "  make generate-features - Generate all feature parquets for Feast"
 	@echo "  make data-aggregates - Compute aggregated features"
 	@echo ""
 	@echo "Feature Store:"
@@ -49,6 +55,8 @@ help:
 	@echo "  make feast-materialize START=2024-01-01 END=2025-01-01 - Custom dates"
 	@echo "  make feast-restart          - Apply + materialize"
 	@echo "  make feast-restart START=2024-01-01 END=2025-01-01 - Custom dates"
+	@echo "  make feast-reset           - Delete online store + registry, then apply + materialize"
+	@echo "  make feast-reset START=2024-01-01 END=2025-01-01 - Custom dates"
 	@echo "  make feast-status           - Show registered features"
 	@echo "  make feast-verify           - Check Redis has feature keys"
 	@echo "  make feast-ui               - Start Feast UI on http://localhost:8888"
@@ -84,6 +92,10 @@ install:
 sync:
 	cd src/backend && uv sync
 	cd scripts && uv sync
+
+# Run tests
+test:
+	cd src/backend && uv run pytest
 
 # Build Docker images
 build: install
@@ -159,13 +171,28 @@ data-elaborate:
 data-process:
 	cd scripts && .venv/bin/python 01_csv_to_parquet.py
 
-# Generate segment feature parquets (email, fiscal_code, card_fingerprint history)
-generate-segment-features:
-	cd scripts && uv run python data/generate_segment_features.py
+# Generate feature parquets for Feast (colocated in feature_repo)
+generate-customer-features:
+	cd src/backend/feature_repo && uv run python -m features.compute.customer_features
 
-# Generate charge-level features parquet (aggregated by email)
 generate-charge-features:
-	cd scripts && uv run python data/generate_charge_features.py
+	cd src/backend/feature_repo && uv run python -m features.compute.charge_features
+
+generate-payment-intent-features:
+	cd src/backend/feature_repo && uv run python -m features.compute.payment_intent_features
+
+generate-checkout-features:
+	cd src/backend/feature_repo && uv run python -m features.compute.checkout_features
+
+generate-address-features:
+	cd src/backend/feature_repo && uv run python -m features.compute.address_features
+
+generate-store-features:
+	cd src/backend/feature_repo && uv run python -m features.compute.store_features
+
+# Generate all feature parquets (unified runner)
+generate-features:
+	cd src/backend/feature_repo && uv run python -m features.compute
 
 # Compute aggregated features -> data/04-modeling/
 data-aggregates:
@@ -188,6 +215,16 @@ feast-materialize:
 # Usage: make feast-restart START=2024-01-01 END=2025-01-01
 feast-restart:
 	cd src/backend/feature_repo && uv run feast apply && uv run feast materialize $(START) $(END)
+
+# Reset feature store: delete online store + registry, then apply + materialize
+# Usage: make feast-reset START=2024-01-01 END=2025-01-01
+feast-reset:
+	@echo "Deleting Feast online store and registry..."
+	@rm -f src/backend/feature_repo/data/feast/online_store.db src/backend/feature_repo/data/feast/registry.db
+	@echo "Applying feature definitions..."
+	cd src/backend/feature_repo && uv run feast apply
+	@echo "Materializing features to online store..."
+	cd src/backend/feature_repo && uv run feast materialize $(START) $(END)
 
 # Show registered feature views
 feast-status:
@@ -285,6 +322,36 @@ train-all:
 	$(MAKE) train-production
 	$(MAKE) train-shadow
 
+# Threshold optimization for segments
+threshold-optimize:
+	@echo "Optimizing thresholds for model (@$(PROFILE))..."
+	cd scripts && uv run python optimize_thresholds.py --alias $(PROFILE)
+
 # Create training data only (no training)
 create-training-data:
 	cd scripts && uv run python create_training_data.py
+
+# Run feature selection → writes selected_features.yaml
+feature-select:
+	@echo "Running feature selection pipeline..."
+	cd scripts && uv run python feature_selection.py
+	@echo "Done. Results written to src/backend/feature_repo/selected_features.yaml"
+
+# Full ML pipeline: compute features → apply Feast → create training data → select features → train → optimize
+pipeline:
+	@echo "=== PIPELINE START ==="
+	$(MAKE) generate-features
+	$(MAKE) feast-apply
+	$(MAKE) feast-materialize
+	$(MAKE) create-training-data
+	$(MAKE) feature-select
+	$(MAKE) train PROFILE=production
+	$(MAKE) train PROFILE=shadow
+	$(MAKE) threshold-optimize PROFILE=production
+	$(MAKE) threshold-optimize PROFILE=shadow
+	@echo "=== PIPELINE COMPLETE ==="
+
+# Same as pipeline but logs all output to logs/pipeline.log (overwritten each run)
+pipeline-log:
+	@mkdir -p logs
+	$(MAKE) pipeline 2>&1 | tee logs/pipeline.log

@@ -84,29 +84,74 @@ def _from_feast(entity: str, key: str) -> dict:
 
 
 def get_features(**entities: str) -> dict:
-    """Fetch features from Feast online store.
+    """Fetch all features from Feast online store using a single lookup row.
 
     Args:
-        **entities: Entity key-value pairs to lookup (e.g., customer_id="...", email="...")
+        **entities: Entity key-value pairs (email, customer_id, store_id, etc.)
 
     Returns:
-        dict: Merged feature values from all entity lookups.
+        dict: Features with view__feature prefixed names.
     """
+    if store is None:
+        logger.warning("Feast store not available")
+        return {}
+
+    feature_service = _get_feature_service()
+    if feature_service is None:
+        return {}
+
+    # 1. Build a single entity row with all provided keys
+    # Clean up empty values and non-required entities
+    # If a required entity is missing, use a placeholder so Feast lookup doesn't fail
     required_entities = _get_required_entities()
-    all_features: dict = {}
+    entity_row = {}
+    for name in required_entities:
+        val = entities.get(name)
+        if val is None or val == "" or val == "nan":
+            val = "__UNKNOWN__"
+        entity_row[name] = val
 
-    for entity_name, key in entities.items():
-        if not key:
-            continue
-        if entity_name not in required_entities:
-            logger.debug("Skipping entity %s - not in FeatureService", entity_name)
-            continue
-        features = _from_feast(entity_name, key)
-        for k, v in features.items():
-            if all_features.get(k) is None:
-                all_features[k] = v
+    if not entity_row:
+        logger.warning("No valid entity keys provided for Feast lookup. Entities=%s", entities)
+        return {}
 
-    if not all_features:
-        logger.warning("no feature values found for entities=%s", entities)
+    t0 = time.perf_counter()
+    try:
+        # Fetch features for the whole service in one go
+        response = store.get_online_features(
+            features=feature_service,
+            entity_rows=[entity_row],
+            full_feature_names=True,
+        )
+        elapsed_ms = (time.perf_counter() - t0) * 1000
 
-    return all_features
+        data = response.to_dict()
+        results = {}
+        for feat_name, values in data.items():
+            if feat_name in required_entities:
+                continue
+            val = values[0] if values else None
+            # Convert NaN to None for JSON serialization
+            import math
+
+            if isinstance(val, float) and math.isnan(val):
+                val = None
+            results[feat_name] = val
+
+        logger.info(
+            "Feast lookup service=%s entities=%s: %d features (%.1fms)",
+            FEATURE_SERVICE_NAME,
+            list(entity_row.keys()),
+            len(results),
+            elapsed_ms,
+        )
+        return results
+
+    except Exception as exc:
+        logger.error(
+            "Failed Feast lookup for service=%s entities=%s: %s",
+            FEATURE_SERVICE_NAME,
+            entity_row,
+            exc,
+        )
+        return {}

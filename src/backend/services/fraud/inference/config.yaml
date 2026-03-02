@@ -1,13 +1,10 @@
 mlflow:
   tracking_uri: http://localhost:5002
   model_uri: models:/fraud-detector@production
-  fallback: random
 
 shadow:
   enabled: true
   model_uri: models:/fraud-detector@shadow
-
-canary:
-  enabled: true
-  model_uri: models:/fraud-detector@canary
-  traffic_percentage: 30
+  canary:
+    enabled: true
+    traffic_percentage: 30

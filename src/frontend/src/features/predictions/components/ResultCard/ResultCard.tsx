@@ -9,8 +9,8 @@ export function ResultCard({
   segmentReason,
   productionScore,
   shadowScore,
-  canaryScore,
   scoredBy,
+  isFraudTruth,
 }: ResultCardProps) {
   const isBlock = decision === "BLOCK"
   const isApprove = decision === "APPROVE"
@@ -40,12 +40,21 @@ export function ResultCard({
             <span className={`px-4 py-1.5 rounded-full text-sm font-bold ${badgeColor}`}>
               {decision}
             </span>
-            {scoredBy === "canary" && (
+            {scoredBy === "shadow" && (
               <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-semibold uppercase">
-                Canary
+                Canary (Shadow)
               </span>
             )}
           </div>
+        </div>
+
+        <div className="text-right">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+            Ground Truth
+          </p>
+          <span className={`px-2 py-0.5 rounded text-xs font-bold ${isFraudTruth ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+            {isFraudTruth ? "FRAUD" : "CLEAN"}
+          </span>
         </div>
 
         <div className="text-right">
@@ -59,25 +68,21 @@ export function ResultCard({
       </div>
 
       {/* ---- Model Scores ---- */}
-      {(productionScore != null || shadowScore != null || canaryScore != null) && (
+      {(productionScore != null || shadowScore != null) && (
         <div className="px-6 py-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
             Model Scores
           </p>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <ScoreCell
               label="Production"
               value={productionScore}
               active={scoredBy === "production"}
             />
             <ScoreCell
-              label="Shadow"
+              label="Shadow (Canary)"
               value={shadowScore}
-            />
-            <ScoreCell
-              label="Canary"
-              value={canaryScore}
-              active={scoredBy === "canary"}
+              active={scoredBy === "shadow"}
             />
           </div>
         </div>

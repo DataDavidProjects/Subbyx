@@ -17,17 +17,19 @@ def determine_segment(
     request: SegmentDetermineRequest,
 ) -> SegmentDetermineResponse:
     logger.debug(
-        "determining segment for email=%s, fiscal_code=%s, card_fingerprint=%s",
+        "determining segment for customer_id=%s, email=%s, fiscal_code=%s, timestamp=%s",
+        request.customer_id,
         request.email,
         request.fiscal_code,
-        request.card_fingerprint,
+        request.timestamp,
     )
 
     segment, reason = _determine_segment(
-        customer_id="",
+        customer_id=request.customer_id,
         email=request.email,
         fiscal_code=request.fiscal_code,
         card_fingerprint=request.card_fingerprint,
+        timestamp=request.timestamp,
     )
 
     logger.debug("segment=%s, reason=%s", segment, reason)

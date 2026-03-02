@@ -78,7 +78,6 @@ Thumbs.db
 dump.rdb
 data/
 docs/
-scripts/
 .ruff_cache
 .coverage
 .coverage.*

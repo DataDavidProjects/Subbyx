@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 PRODUCTION_MODEL_URI = "models:/fraud-detector@production"
 SHADOW_MODEL_URI = "models:/fraud-detector@shadow"
-CANARY_MODEL_URI = "models:/fraud-detector@canary"
 DEFAULT_CANARY_TRAFFIC_PCT = 10
 
 
@@ -32,35 +31,30 @@ DEFAULT_CANARY_TRAFFIC_PCT = 10
 
 
 def score_models(features: dict) -> ScoringResult:
-    """Run features through production, shadow, and canary models.
+    """Run features through production and shadow models.
 
     Shadow model always runs silently for comparison.
-    Canary model replaces production for a % of traffic when enabled.
+    When canary is enabled, a % of traffic is routed to shadow for A/B testing.
     """
     production_score = production_model.predict(features)
 
-    # Shadow: score silently for offline comparison
+    # Shadow: score silently for offline comparison + canary traffic
     shadow_score: float | None = None
+    scored_by = "production"
+
     if _shadow_model is not None:
         try:
             shadow_score = _shadow_model.predict(features)
             logger.debug("shadow score: %.4f", shadow_score)
+
+            # Canary: route a % of traffic to shadow for A/B test
+            if _canary_traffic_pct > 0 and random.randint(1, 100) <= _canary_traffic_pct:
+                scored_by = "shadow"
+                logger.debug("canary: routed to shadow")
         except Exception as exc:
             logger.warning("Shadow model failed: %s", exc)
 
-    # Canary: randomly route a slice of traffic to the new model
-    canary_score: float | None = None
-    scored_by = "production"
-
-    if _canary_model is not None and random.randint(1, 100) <= _canary_traffic_pct:
-        try:
-            canary_score = _canary_model.predict(features)
-            scored_by = "canary"
-            logger.debug("canary score: %.4f (used)", canary_score)
-        except Exception as exc:
-            logger.warning("Canary model failed: %s", exc)
-
-    effective_score = canary_score if scored_by == "canary" else production_score
+    effective_score = shadow_score if scored_by == "shadow" else production_score
 
     return ScoringResult(
         score=effective_score,
@@ -68,7 +62,6 @@ def score_models(features: dict) -> ScoringResult:
         features=features,
         production_score=production_score,
         shadow_score=shadow_score,
-        canary_score=canary_score,
     )
 
 
@@ -84,7 +77,6 @@ class ScoringResult:
     features: dict | None = None
     production_score: float | None = None
     shadow_score: float | None = None
-    canary_score: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -113,25 +105,25 @@ class Model:
     def predict(self, features: dict) -> float:
         self._ensure_loaded()
 
-        if self._loaded and self._loaded.model is not None:
-            try:
-                cols = self.feature_columns
-                row = {
-                    col: float(features[col]) if features.get(col) is not None else np.nan
-                    for col in cols
-                }
-                df = pd.DataFrame([row], columns=cols)
-                proba = self._loaded.model.predict_proba(df)[0]
-                score = float(proba[1]) if len(proba) > 1 else float(proba[0])
-                logger.info("[MODEL] %s SCORE=%.4f", self._name, score)
-                return score
-            except Exception as exc:
-                logger.warning("[MODEL] %s predict failed: %s", self._name, exc)
+        if self._loaded is None or self._loaded.model is None:
+            raise RuntimeError(f"Model {self._name} is not loaded")
 
-        # Fallback: random score when the model is unavailable
-        score = random.random()
-        logger.warning("[MODEL] %s unavailable, RANDOM=%.4f", self._name, score)
-        return score
+        try:
+            cols = self.feature_columns
+            row = {
+                col: float(features[col]) if features.get(col) is not None else np.nan
+                for col in cols
+            }
+            df = pd.DataFrame([row], columns=cols)
+            proba = self._loaded.model.predict_proba(df)[0]
+            score = float(proba[1]) if len(proba) > 1 else float(proba[0])
+            logger.info("[MODEL] %s SCORE=%.4f", self._name, score)
+            return score
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            logger.warning("[MODEL] %s predict failed: %s", self._name, exc)
+            raise RuntimeError(f"Model {self._name} prediction failed: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -141,20 +133,14 @@ class Model:
 
 production_model = Model("production", PRODUCTION_MODEL_URI)
 
-# Shadow model: runs alongside production for offline A/B comparison
+# Shadow model: runs alongside production for offline comparison + canary traffic
 _shadow_model: Model | None = None
 _shadow_config = mlflow_config.get("shadow", {})
 if _shadow_config.get("enabled"):
-    _shadow_model = Model(
-        "shadow", _shadow_config.get("model_uri", SHADOW_MODEL_URI)
-    )
+    _shadow_model = Model("shadow", _shadow_config.get("model_uri", SHADOW_MODEL_URI))
 
-# Canary model: gradually rolls out a new model to a % of live traffic
-_canary_model: Model | None = None
+# Canary: route a % of live traffic to shadow for A/B testing
 _canary_traffic_pct: int = 0
-_canary_config = mlflow_config.get("canary", {})
+_canary_config = _shadow_config.get("canary", {})
 if _canary_config.get("enabled"):
-    _canary_model = Model(
-        "canary", _canary_config.get("model_uri", CANARY_MODEL_URI)
-    )
     _canary_traffic_pct = _canary_config.get("traffic_percentage", DEFAULT_CANARY_TRAFFIC_PCT)

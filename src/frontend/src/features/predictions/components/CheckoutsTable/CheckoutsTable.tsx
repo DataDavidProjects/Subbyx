@@ -79,6 +79,7 @@ export function CheckoutsTable({
   const [searchValue, setSearchValue] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("")
   const [gradeFilter, setGradeFilter] = useState<string>("")
+  const [truthFilter, setTruthFilter] = useState<string>("all")
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
@@ -102,6 +103,12 @@ export function CheckoutsTable({
     const grade = value === "all" ? "" : value
     setGradeFilter(grade)
     onFilterChange({ grade: grade || undefined })
+  }
+
+  const handleTruthChange = (value: string) => {
+    setTruthFilter(value)
+    const is_fraud = value === "fraud" ? true : value === "clean" ? false : undefined
+    onFilterChange({ is_fraud })
   }
 
   const handleSortToggle = () => {
@@ -234,6 +241,16 @@ export function CheckoutsTable({
             ))}
           </SelectContent>
         </Select>
+        <Select value={truthFilter} onValueChange={handleTruthChange}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="Truth" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Truth</SelectItem>
+            <SelectItem value="fraud">Fraud</SelectItem>
+            <SelectItem value="clean">Clean</SelectItem>
+          </SelectContent>
+        </Select>
         <Button variant="outline" onClick={handleSortToggle} className="gap-1.5">
           <ArrowUpDown className="h-4 w-4" />
           Date {sortOrder === "desc" ? "Newest" : "Oldest"}
@@ -267,6 +284,7 @@ export function CheckoutsTable({
               <TableHead>Category</TableHead>
               <TableHead>Grade</TableHead>
               <TableHead>SKU</TableHead>
+              <TableHead>Truth</TableHead>
               <TableHead>Created</TableHead>
             </TableRow>
           </TableHeader>
@@ -347,6 +365,11 @@ export function CheckoutsTable({
                   </TableCell>
                   <TableCell className="font-mono text-xs whitespace-nowrap">
                     {checkout.sku}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={checkout.is_fraud ? "destructive" : "outline"}>
+                      {checkout.is_fraud ? "FRAUD" : "CLEAN"}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap">
                     {formatDate(checkout.created)}

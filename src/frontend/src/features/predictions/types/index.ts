@@ -21,7 +21,6 @@ export interface CheckoutResponse {
   features: Record<string, unknown> | null
   production_score: number | null
   shadow_score: number | null
-  canary_score: number | null
   scored_by: string | null
 }
 
