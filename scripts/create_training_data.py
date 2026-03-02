@@ -107,7 +107,10 @@ def main() -> None:
     n_null_store = entity_df["store_id"].isna().sum()
     logger.info(
         "Entity key coverage: email=%d/%d null, customer_id=%d null, store_id=%d null",
-        n_null_email, len(entity_df), n_null_cust, n_null_store,
+        n_null_email,
+        len(entity_df),
+        n_null_cust,
+        n_null_store,
     )
 
     # Drop rows with null email — no customer record means no identity/charge features;
@@ -193,7 +196,9 @@ def main() -> None:
             how="left",
         )
 
-    logger.info("After per-view LEFT JOINs: %d rows (entity_df had %d)", len(training_df), len(entity_df))
+    logger.info(
+        "After per-view LEFT JOINs: %d rows (entity_df had %d)", len(training_df), len(entity_df)
+    )
     feature_cols = all_feature_cols
 
     # -- Fill NULLs with defaults (no prior history) --
@@ -217,16 +222,32 @@ def main() -> None:
     logger.info("Total samples: %d  |  fraud: %d (%.1f%%)", total, fraud_count, fraud_pct)
 
     # -- Split --
+    train_start = _dates.get("train_start", "2024-01-01")
     train_end = _dates["train_end"]
+    val_start = _dates.get("val_start", train_end)
     val_end = _dates["val_end"]
+    test_start = _dates.get("test_start", val_end)
+    test_end = _dates["test_end"]
 
-    train = training_df[training_df[TIMESTAMP_COL] < train_end]
-    val = training_df[
-        (training_df[TIMESTAMP_COL] >= train_end) & (training_df[TIMESTAMP_COL] < val_end)
+    train = training_df[
+        (training_df[TIMESTAMP_COL] >= train_start) & (training_df[TIMESTAMP_COL] < train_end)
     ]
-    test = training_df[training_df[TIMESTAMP_COL] >= val_end]
+    val = training_df[
+        (training_df[TIMESTAMP_COL] >= val_start) & (training_df[TIMESTAMP_COL] < val_end)
+    ]
+    test = training_df[
+        (training_df[TIMESTAMP_COL] >= test_start) & (training_df[TIMESTAMP_COL] < test_end)
+    ]
 
-    logger.info("Splits (train_end=%s, val_end=%s):", train_end, val_end)
+    logger.info(
+        "Splits (%s to %s, %s to %s, %s to %s):",
+        train_start,
+        train_end,
+        val_start,
+        val_end,
+        test_start,
+        test_end,
+    )
     logger.info("  train: %d samples (%.1f%% fraud)", len(train), train[LABEL_COL].mean() * 100)
     logger.info("  val:   %d samples (%.1f%% fraud)", len(val), val[LABEL_COL].mean() * 100)
     logger.info("  test:  %d samples (%.1f%% fraud)", len(test), test[LABEL_COL].mean() * 100)

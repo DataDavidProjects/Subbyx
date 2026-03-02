@@ -52,3 +52,57 @@ payment_intent_features = FeatureView(
     ],
     source=payment_intent_features_source,
 )
+
+payment_intent_stats_source = FileSource(
+    path=str(_SOURCES_DIR / "payment_intent_stats.parquet"),
+    timestamp_field="created",
+)
+
+payment_intent_stats_features = FeatureView(
+    name="payment_intent_stats_features",
+    entities=[email],
+    description="Aggregated payment intent history statistics per customer email.",
+    schema=[
+        Field(
+            name="n_payment_intents",
+            dtype=Float64,
+            tags={
+                "label": "Total Payment Intents",
+                "description": "Total number of payment intents attempted by this customer.",
+            },
+        ),
+        Field(
+            name="n_failures",
+            dtype=Float64,
+            tags={
+                "label": "Failed Payment Intents",
+                "description": "Number of payment intents that failed or require payment method.",
+            },
+        ),
+        Field(
+            name="failure_rate",
+            dtype=Float64,
+            tags={
+                "label": "Payment Intent Failure Rate",
+                "description": "Ratio of failed payment intents to total (0.0–1.0). High values indicate payment issues.",
+            },
+        ),
+        Field(
+            name="n_succeeded",
+            dtype=Float64,
+            tags={
+                "label": "Succeeded Payments",
+                "description": "Number of payment intents that succeeded.",
+            },
+        ),
+        Field(
+            name="success_rate",
+            dtype=Float64,
+            tags={
+                "label": "Payment Success Rate",
+                "description": "Ratio of succeeded payments to total (0.0–1.0). Higher is better.",
+            },
+        ),
+    ],
+    source=payment_intent_stats_source,
+)

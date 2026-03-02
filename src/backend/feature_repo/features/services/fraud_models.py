@@ -22,7 +22,7 @@ from feast import FeatureService, FeatureView
 from features.views.charges import charge_features, charge_stats_features
 from features.views.checkouts import checkout_features
 from features.views.customers import customer_features, customer_profile_features
-from features.views.payment_intents import payment_intent_features
+from features.views.payment_intents import payment_intent_features, payment_intent_stats_features
 from features.views.addresses import address_features
 from features.views.stores import store_features, store_stats_features
 from features.views.geo_time import geo_time_features
@@ -33,16 +33,17 @@ from features.views.geo_time import geo_time_features
 # =============================================================================
 
 ALL_VIEWS: list[FeatureView] = [
-    charge_features,          # per-charge event: risk_score, card_brand, card_issuer
-    charge_stats_features,    # expanding-window per-email: n_charges, failures, rate
-    checkout_features,        # checkout context: grade, sku, subscription_value
+    charge_features,  # per-charge event: risk_score, card_brand, card_issuer
+    charge_stats_features,  # expanding-window per-email: n_charges, failures, rate
+    checkout_features,  # checkout context: grade, sku, subscription_value
     payment_intent_features,  # Stripe PI: amount, status, n_failures
-    customer_features,        # identity signals: name/email match scores, fiscal_code
+    payment_intent_stats_features,  # aggregated PI history: n_intents, failures, success_rate
+    customer_features,  # identity signals: name/email match scores, fiscal_code
     customer_profile_features,  # derived: n_emails_per_fiscal_code, address_mismatch
-    address_features,         # raw geo: locality, city, state, postal_code
-    store_features,           # store metadata: partner, province, area
-    store_stats_features,     # expanding-window per-store: success_rate, avg_value
-    geo_time_features,        # rolling geo-velocity + temporal (PIT-correct)
+    address_features,  # raw geo: locality, city, state, postal_code
+    store_features,  # store metadata: partner, province, area
+    store_stats_features,  # expanding-window per-store: success_rate, avg_value
+    geo_time_features,  # rolling geo-velocity + temporal (PIT-correct)
 ]
 
 
@@ -68,33 +69,27 @@ _BASELINE_PRODUCTION_FEATURES = [
     "charge_stats_features__n_charges",
     "charge_stats_features__n_failures",
     "charge_stats_features__failure_rate",
-
     # -- Stripe risk score (external signal) --
     # Radar's ML score; strong alone but needs local context to avoid
     # false positives on legitimate high-risk regions.
     "charge_features__outcome_risk_score",
-
     # -- Transaction context --
     # Higher subscription values attract more fraud; amount is the
     # single most predictive non-identity feature (MI ~0.068).
     "payment_intent_features__amount",
-
     # -- Store reputation --
     # Stores with historically low success rates correlate with fraud
     # clusters (compromised partner or lax KYC).
     "store_stats_features__store_success_rate",
-
     # -- Identity integrity --
     # Multiple emails per fiscal code = synthetic identity.
     # Address mismatch between billing and residential = classic flag.
     "customer_profile_features__n_emails_per_fiscal_code",
     "customer_profile_features__is_address_mismatch",
-
     # -- Temporal patterns --
     # Late-night checkouts (22-06) show ~3x fraud rate vs business hours.
     "geo_time_features__checkout_hour",
     "geo_time_features__is_late_night",
-
     # -- Geo-velocity (replaces static province encoding) --
     # Rolling 30d request count captures regional attack surges without
     # permanently penalizing high-traffic provinces.
@@ -140,6 +135,7 @@ SHADOW_FEATURES = [
 # =============================================================================
 # View Projection Helper
 # =============================================================================
+
 
 def _select_from_views(
     feature_names: list[str],

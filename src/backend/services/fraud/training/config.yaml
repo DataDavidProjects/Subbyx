@@ -3,17 +3,26 @@
 # Data paths
 data:
   training_dir: "/Users/davidelupis/Desktop/Subbyx/data/04-modeling"
+  date_column: "created"
+  checkout_table: "checkouts"
+  customer_table: "customers"
+  charges_table: "charges"
+  payment_intents_table: "payment_intents"
 
 # Fraud label threshold (days)
 modeling:
   fraud_threshold_days: 15
+  target_column: "dunning_days"
+  target_is_fraud: "dunning_days > 15"
 
-# Time-based split dates (used by create_training_data.py and checkouts API)
+# Time-based split dates
 dates:
-  train_end: "2024-06-01"
-  val_end: "2024-08-15"
-  test_start: "2024-08-15"
-  test_end: "2024-10-31"
+  train_start: "2024-03-01"
+  train_end: "2024-08-05"
+  val_start: "2024-08-05"
+  val_end: "2024-08-10"
+  test_start: "2024-08-10"
+  test_end: "2024-08-31"
 
 # MLflow configuration
 mlflow:

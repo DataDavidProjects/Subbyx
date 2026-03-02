@@ -163,9 +163,6 @@ data-audit: clean-data
 	cd scripts && VIRTUAL_ENV= uv run python notebooks/05-addresses-audit.py
 	cd scripts && VIRTUAL_ENV= uv run python notebooks/06-stores-audit.py
 
-# Time-based train/test split -> data/02-elaboration/
-data-elaborate:
-	cd scripts && uv run python data/elaborate.py
 
 # Convert CSV to Parquet + type fixes -> data/03-processed/
 data-process:
