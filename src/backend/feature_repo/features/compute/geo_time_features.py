@@ -5,6 +5,15 @@ Computes multi-window rolling geo-velocity features (PIT-correct)
 and checkout temporal features. All windows are strictly exclusive
 (look-back only, current event excluded).
 
+Hierarchical Bayesian smoothing (empirical Bayes):
+  Sparse local fraud rates are shrunk toward the parent geographic level
+  to avoid zero-variance features for regions with few observations.
+
+    smoothed_rate = (n_local + prior_weight * parent_rate)
+                    / (n_local_requests + prior_weight)
+
+  Hierarchy:  postal → province → national
+
 Feature windows:
   Province-level:  5d, 10d, 30d, 60d
   Postal code:     5d, 10d, 30d
@@ -32,6 +41,39 @@ _OUTPUT_DIR = _REPO_ROOT / "src" / "backend" / "feature_repo" / "data" / "source
 PROVINCE_WINDOWS = [5, 10, 30, 60]
 POSTAL_WINDOWS = [5, 10, 30]
 
+# Bayesian shrinkage weight — roughly how many local observations are needed
+# before the local rate dominates the parent prior.  10 is a standard choice
+# (equivalent to a Beta(prior_weight*p, prior_weight*(1-p)) prior).
+PRIOR_WEIGHT = 10
+
+
+def _compute_national_rolling(
+    df: pd.DataFrame,
+    label_col: str,
+    window_days: int,
+) -> np.ndarray:
+    """PIT-correct national (global) fraud rate for each row.
+
+    Returns an array of length ``len(df)`` aligned to the **sorted**
+    DataFrame index (caller must sort by ``created`` first or pass an
+    already-sorted frame).
+    """
+    times = df["created"].values
+    labels = np.nan_to_num(df[label_col].values.astype(float), nan=0.0)
+    cum_frauds = np.concatenate([[0.0], np.cumsum(labels)])
+    window_ns = np.timedelta64(window_days, "D")
+
+    n = len(df)
+    national_rate = np.zeros(n, dtype=np.float64)
+
+    for i in range(n):
+        lo = np.searchsorted(times[:i], times[i] - window_ns, side="left")
+        n_req = i - lo
+        if n_req > 0:
+            national_rate[i] = (cum_frauds[i] - cum_frauds[lo]) / n_req
+
+    return national_rate
+
 
 def _compute_rolling_geo(
     df: pd.DataFrame,
@@ -39,6 +81,8 @@ def _compute_rolling_geo(
     label_col: str,
     window_days: int,
     prefix: str,
+    parent_rates: np.ndarray | None = None,
+    prior_weight: float = PRIOR_WEIGHT,
 ) -> pd.DataFrame:
     """
     For every row, count requests and fraud events from the same
@@ -46,6 +90,15 @@ def _compute_rolling_geo(
 
     Uses a binary-search approach (O(n log n)) rather than O(n²) to
     scale to larger datasets.
+
+    When *parent_rates* is provided (an array aligned to the sorted df),
+    the raw fraud rate is replaced with a Bayesian-smoothed estimate::
+
+        smoothed = (n_frauds + prior_weight * parent_rate)
+                   / (n_requests + prior_weight)
+
+    This shrinks sparse local estimates toward the parent geographic level,
+    eliminating the zero-variance problem for regions with few observations.
 
     Returns columns:
       {prefix}_n_requests_{window_days}d
@@ -56,7 +109,13 @@ def _compute_rolling_geo(
     fraud_col = f"{prefix}_n_frauds_{window_days}d"
     rate_col = f"{prefix}_fraud_rate_{window_days}d"
 
+    # Preserve original index so parent_rates (aligned to caller's frame)
+    # stay in sync after sorting.
+    df = df.copy()
+    df["_orig_pos"] = np.arange(len(df))
     df = df.sort_values("created").reset_index(drop=True)
+    sort_order = df["_orig_pos"].values  # maps sorted pos → original pos
+
     window_ns = np.timedelta64(window_days, "D")
 
     n_requests = np.zeros(len(df), dtype=np.float32)
@@ -79,7 +138,19 @@ def _compute_rolling_geo(
             n_requests[idx] = n_req
             n_frauds[idx] = n_frd
 
-    fraud_rate = np.where(n_requests > 0, n_frauds / n_requests, 0.0)
+    if parent_rates is not None:
+        # Re-order parent_rates (aligned to caller's index) to match
+        # the sorted order used inside this function.
+        parent_sorted = np.asarray(parent_rates, dtype=np.float64)[sort_order]
+
+        # Bayesian shrinkage: blend local rate with parent-level prior.
+        # When n_requests is large the local rate dominates; when small
+        # (or zero) we fall back to the parent rate.
+        fraud_rate = (n_frauds + prior_weight * parent_sorted) / (
+            n_requests + prior_weight
+        )
+    else:
+        fraud_rate = np.where(n_requests > 0, n_frauds / n_requests, 0.0)
 
     return pd.DataFrame(
         {req_col: n_requests, fraud_col: n_frauds, rate_col: fraud_rate},
@@ -147,10 +218,24 @@ def generate() -> None:
     ).astype(int)
 
     # ------------------------------------------------------------------
-    # 3. Province-level rolling windows
+    # 3. National-level rolling prior (used as parent for province)
+    # ------------------------------------------------------------------
+    # Sort once — national and province computations share this order.
+    checkouts = checkouts.sort_values("created").reset_index(drop=True)
+
+    all_windows = sorted(set(PROVINCE_WINDOWS) | set(POSTAL_WINDOWS))
+    national_rates: dict[int, np.ndarray] = {}
+    for w in all_windows:
+        logger.info("Computing national rolling prior (%dd)...", w)
+        national_rates[w] = _compute_national_rolling(
+            checkouts, label_col="is_fraud", window_days=w,
+        )
+
+    # ------------------------------------------------------------------
+    # 4. Province-level rolling windows (smoothed with national prior)
     # ------------------------------------------------------------------
     for w in PROVINCE_WINDOWS:
-        logger.info("Computing province rolling features (%dd)...", w)
+        logger.info("Computing province rolling features (%dd, smoothed)...", w)
         cols = _compute_rolling_geo(
             df=checkouts[["created", "province_clean", "is_fraud"]].rename(
                 columns={"province_clean": "geo"}
@@ -159,14 +244,23 @@ def generate() -> None:
             label_col="is_fraud",
             window_days=w,
             prefix="province",
+            parent_rates=national_rates[w],
         )
         checkouts = checkouts.join(cols)
 
     # ------------------------------------------------------------------
-    # 4. Postal-code rolling windows
+    # 5. Postal-code rolling windows (smoothed with province prior)
     # ------------------------------------------------------------------
     for w in POSTAL_WINDOWS:
-        logger.info("Computing postal rolling features (%dd)...", w)
+        logger.info("Computing postal rolling features (%dd, smoothed)...", w)
+        # Use the (already-smoothed) province fraud rate as parent prior
+        province_rate_col = f"province_fraud_rate_{w}d"
+        if province_rate_col in checkouts.columns:
+            parent = checkouts[province_rate_col].values
+        else:
+            # Fallback to national if province window not available
+            parent = national_rates[w]
+
         cols = _compute_rolling_geo(
             df=checkouts[["created", "postal_clean", "is_fraud"]].rename(
                 columns={"postal_clean": "geo"}
@@ -175,11 +269,12 @@ def generate() -> None:
             label_col="is_fraud",
             window_days=w,
             prefix="postal",
+            parent_rates=parent,
         )
         checkouts = checkouts.join(cols)
 
     # ------------------------------------------------------------------
-    # 5. Feast output (entity = email, timestamp = created)
+    # 6. Feast output (entity = email, timestamp = created)
     # ------------------------------------------------------------------
     temporal_cols = ["checkout_hour", "checkout_dow", "is_weekend", "is_late_night"]
     province_cols = [

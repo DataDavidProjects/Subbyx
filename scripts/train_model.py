@@ -75,7 +75,7 @@ LGBM_PARAMS = {
     "min_child_samples": 30,
     "reg_alpha": 0.1,
     "reg_lambda": 1.0,
-    "scale_pos_weight": 8.4,
+    "scale_pos_weight": 3,
     "verbose": -1,
 }
 
@@ -151,7 +151,7 @@ def main():
     print("\nTraining Pipeline (Imputer + LightGBM with early stopping)...")
     from lightgbm import early_stopping, log_evaluation
 
-    imputer = SimpleImputer(strategy="constant", fill_value=0)
+    imputer = SimpleImputer(strategy="constant", fill_value=-1)
     X_train_imp = pd.DataFrame(imputer.fit_transform(X_train), columns=feature_columns)
     X_val_imp = pd.DataFrame(imputer.transform(X_val), columns=feature_columns)
 

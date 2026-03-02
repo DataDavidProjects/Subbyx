@@ -267,6 +267,11 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
     # Keep original request features for fallback/selection
     all_features.update(request_features)
 
+    # Add missing-indicator flags (train/serve parity)
+    from services.fraud.features.selection.transformers import AddMissingIndicators
+
+    AddMissingIndicators.enrich_dict(all_features)
+
     from services.fraud.inference.model import score_models
 
     result = score_models(all_features)

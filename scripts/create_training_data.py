@@ -201,8 +201,21 @@ def main() -> None:
     )
     feature_cols = all_feature_cols
 
+    # -- Add missing-indicator columns BEFORE filling NULLs --
+    # These binary flags let the model distinguish "no history" from "zero value".
+    from services.fraud.features.selection import AddMissingIndicators
+
+    missing_ind = AddMissingIndicators()  # auto-detect from default groups
+    training_df = missing_ind.fit_transform(training_df)
+    indicator_cols = list(missing_ind.get_indicators().keys())
+    if indicator_cols:
+        feature_cols.extend(indicator_cols)
+        logger.info("Added missing indicators: %s", indicator_cols)
+
     # -- Fill NULLs with defaults (no prior history) --
     for col in feature_cols:
+        if col in indicator_cols:
+            continue  # indicators are already 0/1, no fill needed
         null_count = training_df[col].isna().sum()
         if null_count > 0:
             # Type-safe fill: use 0 for numeric, "" for objects/strings

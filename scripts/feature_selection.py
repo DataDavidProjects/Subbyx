@@ -45,7 +45,7 @@ _SELECTED_FEATURES_PATH = (
 
 # Constants
 VIF_THRESHOLD = 10.0
-MI_MIN_SCORE = 0.01  # keep features with any predictive signal
+MI_MIN_SCORE = 0.02  # keep features with any predictive signal
 CORR_THRESHOLD = 0.5
 
 

@@ -13,6 +13,121 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 logger = logging.getLogger(__name__)
 
 
+class AddMissingIndicators(BaseEstimator, TransformerMixin):
+    """
+    Adds binary ``__missing`` indicator columns for feature view groups that have
+    high null rates.
+
+    Each group maps a single indicator name to a list of source columns.  The
+    indicator is ``1`` when **all** source columns in the group are null for a
+    given row (i.e. the entire view is absent — no charge history, no payment
+    intent, etc.).
+
+    Parameters
+    ----------
+    groups : dict[str, list[str]]
+        Mapping of ``indicator_column_name`` → list of source column names.
+        Example::
+
+            {
+                "charge_features__missing":   ["charge_features__outcome_risk_score",
+                                                "charge_stats_features__n_charges"],
+                "pi_features__missing":       ["payment_intent_features__amount",
+                                                "payment_intent_stats_features__n_payment_intents"],
+            }
+
+    If *groups* is ``None`` (the default), the transformer auto-detects view
+    groups from columns that follow the ``viewname__field`` convention and
+    creates one indicator per view whose null rate exceeds *null_threshold*.
+
+    null_threshold : float
+        Minimum fraction of nulls (0-1) required to generate an indicator
+        when using auto-detection.  Ignored when *groups* is provided
+        explicitly.  Default ``0.20``.
+    """
+
+    # Default view groups that are known to have high null rates.
+    _DEFAULT_GROUPS: dict[str, list[str]] = {
+        "charge_features__missing": [
+            "charge_features__outcome_risk_score",
+            "charge_stats_features__n_charges",
+        ],
+        "pi_features__missing": [
+            "payment_intent_features__amount",
+            "payment_intent_stats_features__n_payment_intents",
+        ],
+        "address_features__missing": [
+            "address_features__postal_code",
+        ],
+    }
+
+    def __init__(
+        self,
+        groups: dict[str, list[str]] | None = None,
+        null_threshold: float = 0.20,
+    ):
+        self.groups = groups
+        self.null_threshold = null_threshold
+        self._resolved_groups: dict[str, list[str]] = {}
+
+    # ------------------------------------------------------------------
+    def fit(self, X: pd.DataFrame, y: Any = None) -> "AddMissingIndicators":
+        if self.groups is not None:
+            # Use explicitly provided groups — keep only those whose probe
+            # columns actually exist in the data.
+            self._resolved_groups = {
+                ind: [c for c in cols if c in X.columns]
+                for ind, cols in self.groups.items()
+            }
+            self._resolved_groups = {
+                k: v for k, v in self._resolved_groups.items() if v
+            }
+        else:
+            # Auto-detect from default groups whose probe columns exist.
+            self._resolved_groups = {}
+            for ind, probes in self._DEFAULT_GROUPS.items():
+                existing = [c for c in probes if c in X.columns]
+                if not existing:
+                    continue
+                null_rate = X[existing[0]].isna().mean()
+                if null_rate >= self.null_threshold:
+                    self._resolved_groups[ind] = existing
+                    logger.info(
+                        "MissingIndicator: %s (probe null-rate %.1f%%)",
+                        ind,
+                        null_rate * 100,
+                    )
+        return self
+
+    # ------------------------------------------------------------------
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        for indicator, probe_cols in self._resolved_groups.items():
+            # Indicator = 1 when ALL probe columns are null (entire view absent)
+            X[indicator] = X[probe_cols].isna().all(axis=1).astype(int)
+        return X
+
+    def get_indicators(self) -> dict[str, list[str]]:
+        return self._resolved_groups
+
+    @staticmethod
+    def enrich_dict(features: dict) -> dict:
+        """Add missing-indicator flags to a feature dict (inference time).
+
+        Uses the default probe groups so the logic stays in sync with training.
+        A probe group is "missing" when **all** its probe columns are ``None``
+        or ``NaN`` in *features*.
+        """
+        for indicator, probes in AddMissingIndicators._DEFAULT_GROUPS.items():
+            all_missing = all(
+                features.get(col) is None
+                or (isinstance(features.get(col), float) and np.isnan(features[col]))
+                for col in probes
+            )
+            features[indicator] = 1 if all_missing else 0
+        return features
+
+
 class SelectKBestMutualInfo(BaseEstimator, TransformerMixin):
     def __init__(self, min_score: float = 0.01, k: int | None = None):
         self.min_score = min_score
