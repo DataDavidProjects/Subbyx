@@ -11,7 +11,7 @@
         redis feast-apply feast-materialize feast-restart feast-reset feast-status feast-ui feast-verify \
         dev-backend dev-frontend dev mlflow model-register \
         train train-production train-shadow train-all \
-        test test-checkout
+        test test-checkout evaluate-rules
 
 # Default dates for materialize
 START ?= 2024-01-01
@@ -106,6 +106,7 @@ help:
 	@echo "Validation:"
 	@echo "  make test-checkout          - Test checkout endpoint with curl"
 	@echo "  make test-checkout PAYLOAD='{...}' - Test with custom payload"
+	@echo "  make evaluate-rules         - Evaluate rule performance (AUC-PR, AUC-ROC)"
 
 # Install all project dependencies
 install:
@@ -386,3 +387,7 @@ pipeline:
 pipeline-log:
 	@mkdir -p logs
 	$(MAKE) pipeline 2>&1 | tee logs/pipeline.log
+
+# Evaluate performance of fraud rules on test set
+evaluate-rules:
+	cd scripts && uv run python evaluate_rules.py

@@ -1,27 +1,3 @@
-"""
-Geo-velocity and temporal feature computation.
-
-Computes multi-window rolling geo-velocity features (PIT-correct)
-and checkout temporal features. All windows are strictly exclusive
-(look-back only, current event excluded).
-
-Hierarchical Bayesian smoothing (empirical Bayes):
-  Sparse local fraud rates are shrunk toward the parent geographic level
-  to avoid zero-variance features for regions with few observations.
-
-    smoothed_rate = (n_local + prior_weight * parent_rate)
-                    / (n_local_requests + prior_weight)
-
-  Hierarchy:  postal → province → national
-
-Feature windows:
-  Province-level:  5d, 10d, 30d, 60d
-  Postal code:     5d, 10d, 30d
-
-Temporal features (derived directly from checkout timestamp, no look-back):
-  checkout_hour, checkout_dow, is_weekend, is_late_night
-"""
-
 from __future__ import annotations
 
 import logging
@@ -146,9 +122,7 @@ def _compute_rolling_geo(
         # Bayesian shrinkage: blend local rate with parent-level prior.
         # When n_requests is large the local rate dominates; when small
         # (or zero) we fall back to the parent rate.
-        fraud_rate = (n_frauds + prior_weight * parent_sorted) / (
-            n_requests + prior_weight
-        )
+        fraud_rate = (n_frauds + prior_weight * parent_sorted) / (n_requests + prior_weight)
     else:
         fraud_rate = np.where(n_requests > 0, n_frauds / n_requests, 0.0)
 
@@ -228,7 +202,9 @@ def generate() -> None:
     for w in all_windows:
         logger.info("Computing national rolling prior (%dd)...", w)
         national_rates[w] = _compute_national_rolling(
-            checkouts, label_col="is_fraud", window_days=w,
+            checkouts,
+            label_col="is_fraud",
+            window_days=w,
         )
 
     # ------------------------------------------------------------------

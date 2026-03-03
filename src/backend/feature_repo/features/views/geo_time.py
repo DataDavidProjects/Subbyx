@@ -1,10 +1,3 @@
-"""
-Feast FeatureView for rolling geo-velocity and temporal features.
-
-Auto-generates Field entries for all window/stat combinations
-to stay in sync with the compute module's PROVINCE_WINDOWS / POSTAL_WINDOWS.
-"""
-
 from datetime import timedelta
 from pathlib import Path
 from feast import FeatureView, FileSource, Field

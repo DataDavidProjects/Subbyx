@@ -5,6 +5,8 @@ import { CheckoutsAdmin } from "@/features/predictions/components"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
+export const dynamic = "force-dynamic"
+
 async function AdminContent() {
   const initialData = await loadCheckoutsPaginated(1, 10)
   return <CheckoutsAdmin initialData={initialData} />

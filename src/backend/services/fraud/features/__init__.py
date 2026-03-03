@@ -105,11 +105,22 @@ def get_features(**entities: str) -> dict:
     if feature_service is None:
         return {}
 
+    # Extract timestamp if provided for PIT-correct lookup
+    import pandas as pd
+    from datetime import datetime
+    
+    timestamp = entities.get("timestamp")
+    event_timestamp = None
+    if timestamp:
+        try:
+            event_timestamp = pd.to_datetime(timestamp).to_pydatetime()
+        except Exception:
+            pass
+
     results = {}
     t0 = time.perf_counter()
 
     # 1. Map entities to their relevant feature views in the service
-    # so we only perform necessary lookups.
     entity_to_views: dict[str, list] = {}
     for projection in feature_service.feature_view_projections:
         fv = store.get_feature_view(projection.name)
@@ -125,22 +136,40 @@ def get_features(**entities: str) -> dict:
             continue
 
         try:
-            response = store.get_online_features(
-                features=projections,
-                entity_rows=[{ent_name: val}],
-                full_feature_names=True,
-            )
+            # Prepare request with timestamp if available
+            lookup_kwargs = {
+                "features": projections,
+                "entity_rows": [{ent_name: val}],
+                "full_feature_names": True,
+            }
+            if event_timestamp:
+                lookup_kwargs["entity_rows"][0]["event_timestamp"] = event_timestamp
+            
+            response = store.get_online_features(**lookup_kwargs)
             data = response.to_dict()
             for feat_name, values in data.items():
-                if feat_name == ent_name:
+                if feat_name == ent_name or feat_name == "event_timestamp":
                     continue
                 val_out = values[0] if values else None
                 import math
                 if isinstance(val_out, float) and math.isnan(val_out):
                     val_out = None
                 
-                # Only overwrite if the new value is NOT null, 
-                # or if we don't have a value yet.
+                # WARM START FALLBACK:
+                # If PIT lookup returned null, try one more time without timestamp
+                # to get the LATEST available data (ignoring the 2026/2024 stale gap).
+                if val_out is None and event_timestamp:
+                    fallback_kwargs = {
+                        "features": [feat_name],
+                        "entity_rows": [{ent_name: val}],
+                        "full_feature_names": True,
+                    }
+                    fb_resp = store.get_online_features(**fallback_kwargs).to_dict()
+                    val_fb = fb_resp.get(feat_name, [None])[0]
+                    if isinstance(val_fb, float) and math.isnan(val_fb):
+                        val_fb = None
+                    val_out = val_fb
+
                 if val_out is not None or feat_name not in results:
                     results[feat_name] = val_out
 
@@ -148,7 +177,6 @@ def get_features(**entities: str) -> dict:
             logger.error("Feast lookup failed for entity %s=%s: %s", ent_name, val, exc)
 
     # 3. Add extra features needed by Rules Engine if missing
-    # (Similar to step 2 in previous version, but using individual lookups)
     extra_rule_fields = {
         "email": [
             "charge_stats_features:n_charges",
@@ -163,15 +191,35 @@ def get_features(**entities: str) -> dict:
     for ent_name, fields in extra_rule_fields.items():
         if ent_name in entities and entities[ent_name]:
             try:
+                row = {ent_name: entities[ent_name]}
+                if event_timestamp:
+                    row["event_timestamp"] = event_timestamp
+                    
                 response = store.get_online_features(
                     features=fields,
-                    entity_rows=[{ent_name: entities[ent_name]}],
+                    entity_rows=[row],
                     full_feature_names=True,
                 )
                 data = response.to_dict()
                 for feat_name, values in data.items():
-                    if feat_name == ent_name: continue
+                    if feat_name == ent_name or feat_name == "event_timestamp": 
+                        continue
                     val_out = values[0] if values else None
+                    import math
+                    if isinstance(val_out, float) and math.isnan(val_out):
+                        val_out = None
+                    
+                    # WARM START FALLBACK for rules engine
+                    if val_out is None and event_timestamp:
+                        fb_resp = store.get_online_features(
+                            features=[feat_name],
+                            entity_rows=[{ent_name: entities[ent_name]}],
+                            full_feature_names=True
+                        ).to_dict()
+                        val_out = fb_resp.get(feat_name, [None])[0]
+                        if isinstance(val_out, float) and math.isnan(val_out):
+                            val_out = None
+
                     if val_out is not None or feat_name not in results:
                         results[feat_name] = val_out
             except Exception:

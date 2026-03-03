@@ -1,18 +1,3 @@
-"""
-Checkout velocity feature computation.
-
-Computes rolling-window checkout velocity signals per email (PIT-correct,
-current event excluded):
-
-  n_checkouts_7d            — total checkouts in prior 7 days
-  n_expired_7d              — expired checkouts in prior 7 days
-  expired_ratio_7d          — n_expired_7d / n_checkouts_7d (0 if none)
-  n_distinct_categories_30d — distinct product categories in prior 30 days
-  max_value_30d             — max subscription_value in prior 30 days
-
-Uses np.searchsorted() per-email for O(n log n) look-back windows.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -23,9 +8,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path("/Users/davidelupis/Desktop/Subbyx")
-_SOURCES_DIR = (
-    _REPO_ROOT / "src" / "backend" / "feature_repo" / "data" / "sources"
-)
+_SOURCES_DIR = _REPO_ROOT / "src" / "backend" / "feature_repo" / "data" / "sources"
 
 
 def generate() -> None:
@@ -76,9 +59,7 @@ def generate() -> None:
             # --- 30-day window (current event excluded) ---
             lo_30 = np.searchsorted(times[:i], ts - window_30d, side="left")
             if i > lo_30:
-                n_distinct_categories_30d[idx] = len(
-                    set(categories[lo_30:i])
-                )
+                n_distinct_categories_30d[idx] = len(set(categories[lo_30:i]))
                 max_value_30d[idx] = np.nanmax(values[lo_30:i])
 
     output = pd.DataFrame(

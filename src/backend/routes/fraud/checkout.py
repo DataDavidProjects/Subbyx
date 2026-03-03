@@ -247,6 +247,7 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
         store_id=ctx.store_id,
         card_fingerprint=ctx.card_fingerprint,
         fiscal_code=ctx.fiscal_code,
+        timestamp=ctx.timestamp,
     )
 
     # 3a. Payment failure rate check (pre-model rule)

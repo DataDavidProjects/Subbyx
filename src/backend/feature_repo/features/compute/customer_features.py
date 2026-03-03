@@ -50,9 +50,7 @@ def generate() -> None:
             n_bad = mask.sum()
             if n_bad > 0:
                 df.loc[mask, col] = df.loc[mask, col] / 1000.0
-                logger.warning(
-                    "Rescaled %d outlier values in %s (were ×1000)", n_bad, col
-                )
+                logger.warning("Rescaled %d outlier values in %s (were ×1000)", n_bad, col)
 
     # 1. Save Base Customers Parquet
     logger.info("Renaming 'id' to 'customer_id' for Feast entity...")

@@ -1,6 +1,11 @@
 ARG PYTHON_VERSION=3.14
 FROM python:${PYTHON_VERSION}-slim
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install uv
 
 WORKDIR /app

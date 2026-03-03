@@ -1,12 +1,3 @@
-"""
-Checkouts API endpoint.
-
-Note on local vs Docker Compose development:
-- In Docker Compose: uses 'backend' as hostname (set via NEXT_PUBLIC_API_URL in frontend)
-- Locally: uses 'localhost:8001' for backend
-- The backend always reads from the same data path regardless of deployment method
-"""
-
 from __future__ import annotations
 
 import logging
