@@ -274,7 +274,8 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
     all_features = {**feast_features}
 
     # Map request features to their prefixed counterparts if needed by model
-    # This allows request features to shadow/correct historical data from Feast
+    # Note: checkout_features removed from Feast - these are pure request-time values
+    # Card features are now only request-time (via CheckoutContext), not from Feast
     mapping = {
         "subscription_value": "checkout_features__subscription_value",
         "grade": "checkout_features__grade",

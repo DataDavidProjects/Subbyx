@@ -26,22 +26,6 @@ customer_features = FeatureView(
             },
         ),
         Field(
-            name="gender",
-            dtype=String,
-            tags={
-                "label": "Gender",
-                "description": "Gender of the customer as recorded in their profile.",
-            },
-        ),
-        Field(
-            name="birth_country",
-            dtype=String,
-            tags={
-                "label": "Birth Country",
-                "description": "Country of birth of the customer.",
-            },
-        ),
-        Field(
             name="card_owner_names_card_owner_names_match_score",
             dtype=Float64,
             tags={

@@ -139,9 +139,12 @@ def main() -> None:
     # 4. Category risk features (must match extract_request_features logic)
     cat_lower = entity_df["category"].fillna("").str.strip().str.lower()
     entity_df["is_storage_variant"] = cat_lower.str.contains("gb|tb|cpu", regex=True).astype(int)
-    entity_df["is_smartphone_or_watch"] = cat_lower.str.contains("smartphone|smartwatch", regex=True).astype(int)
+    entity_df["is_smartphone_or_watch"] = cat_lower.str.contains(
+        "smartphone|smartwatch", regex=True
+    ).astype(int)
     entity_df["is_high_risk_category"] = (
-        (entity_df["is_storage_variant"] == 1) | cat_lower.str.contains("smartphone|smartwatch", regex=True)
+        (entity_df["is_storage_variant"] == 1)
+        | cat_lower.str.contains("smartphone|smartwatch", regex=True)
     ).astype(int)
     entity_df["category_risk_tier"] = "low"
     entity_df.loc[entity_df["is_smartphone_or_watch"] == 1, "category_risk_tier"] = "medium"
@@ -149,6 +152,50 @@ def main() -> None:
 
     # Keep entity keys + request feature columns needed for train/serve parity
     request_feature_cols = list(REQUEST_FEATURE_SCHEMA.keys())
+
+    # -- Derive card features from charges table via payment_intent --
+    logger.info("Deriving card features from charges table...")
+    charges = pd.read_csv(DATA_DIR / "charges.csv")
+
+    # Join checkouts to charges via payment_intent to get card_fingerprint
+    checkout_payment = checkouts[["id", "payment_intent"]].copy()
+    checkout_payment = checkout_payment.rename(columns={"id": CHECKOUT_ID_COL})
+    checkout_payment = checkout_payment.dropna(subset=["payment_intent"])
+
+    # Get card_fingerprint per payment_intent
+    payment_to_card = charges[
+        ["payment_intent", "card_fingerprint", "card_brand", "card_funding", "card_cvc_check"]
+    ].drop_duplicates(subset=["payment_intent"])
+
+    # Merge to get card details per checkout
+    card_df = checkout_payment.merge(payment_to_card, on="payment_intent", how="left")
+
+    # Add card features to entity_df via checkout_id
+    entity_df = entity_df.merge(
+        card_df[[CHECKOUT_ID_COL, "card_brand", "card_funding", "card_cvc_check"]],
+        on=CHECKOUT_ID_COL,
+        how="left",
+    )
+
+    # Fill missing card features
+    entity_df["card_brand"] = entity_df["card_brand"].fillna("")
+    entity_df["card_funding"] = entity_df["card_funding"].fillna("")
+    entity_df["card_cvc_check"] = entity_df["card_cvc_check"].fillna("")
+
+    # Derive card risk features (must match extract_request_features logic)
+    card_funding_lower = entity_df["card_funding"].fillna("").str.lower().str.strip()
+    card_cvc_lower = entity_df["card_cvc_check"].fillna("").str.lower().str.strip()
+
+    entity_df["is_debit_card"] = (card_funding_lower == "debit").astype(int)
+    entity_df["is_prepaid_card"] = (card_funding_lower == "prepaid").astype(int)
+    entity_df["card_cvc_fail"] = (card_cvc_lower == "fail").astype(int)
+    entity_df["card_cvc_unavailable"] = (card_cvc_lower == "unavailable").astype(int)
+    entity_df["is_high_risk_card"] = (
+        (entity_df["is_debit_card"] == 1)
+        | (entity_df["card_cvc_fail"] == 1)
+        | (entity_df["card_cvc_unavailable"] == 1)
+    ).astype(int)
+
     entity_cols = [
         CHECKOUT_ID_COL,
         "email",
@@ -171,6 +218,24 @@ def main() -> None:
     # specific features without data become NULL (later filled with defaults).
     feast_df = entity_df.copy()
     feast_df["store_id"] = feast_df["store_id"].fillna("__UNKNOWN__")
+
+    # Add card_fingerprint to feast_df for card_features lookup
+    # Use payment_to_card directly (has card_fingerprint) not card_df (already merged to entity_df)
+    checkout_to_card = payment_to_card[["payment_intent", "card_fingerprint"]].copy()
+    checkout_to_card = checkout_to_card.rename(columns={"id": CHECKOUT_ID_COL})
+    # Need to link checkout_id to payment_intent
+    checkout_to_fingerprint = checkouts[["id", "payment_intent"]].copy()
+    checkout_to_fingerprint = checkout_to_fingerprint.rename(columns={"id": CHECKOUT_ID_COL})
+    checkout_to_fingerprint = checkout_to_fingerprint.dropna(subset=["payment_intent"])
+    checkout_to_fingerprint = checkout_to_fingerprint.merge(
+        checkout_to_card, on="payment_intent", how="left"
+    )
+    checkout_to_fingerprint = checkout_to_fingerprint[
+        [CHECKOUT_ID_COL, "card_fingerprint"]
+    ].drop_duplicates()
+
+    feast_df = feast_df.merge(checkout_to_fingerprint, on=CHECKOUT_ID_COL, how="left")
+    feast_df["card_fingerprint"] = feast_df["card_fingerprint"].fillna("__UNKNOWN__")
 
     store = FeatureStore(repo_path=str(FEATURE_REPO_PATH))
 
@@ -198,6 +263,12 @@ def main() -> None:
         if not feat_cols:
             continue
 
+        # Remove card_fingerprint from feat_cols if present (it's an entity key, not a feature)
+        # This avoids duplicate columns when merging
+        feat_cols = [c for c in feat_cols if c != "card_fingerprint"]
+        if not feat_cols:
+            continue
+
         all_feature_cols.extend(feat_cols)
 
         # LEFT JOIN this view's features back to the spine
@@ -222,6 +293,23 @@ def main() -> None:
     if indicator_cols:
         feature_cols.extend(indicator_cols)
         logger.info("Added missing indicators: %s", indicator_cols)
+
+    # -- Remove duplicate card features --
+    # Request features (card_brand, card_funding, card_cvc_check) are the "truth"
+    # at inference time - batch features are duplicates from Feast
+    duplicate_card_cols = [
+        c
+        for c in training_df.columns
+        if "card_brand" in c or "card_funding" in c or "card_cvc_check" in c
+    ]
+    # Keep request features, drop batch duplicates
+    cols_to_drop = [
+        c for c in duplicate_card_cols if c.startswith(("charge_features__", "card_features__"))
+    ]
+    if cols_to_drop:
+        logger.info("Dropping duplicate card batch features: %s", cols_to_drop)
+        training_df = training_df.drop(columns=cols_to_drop)
+        feature_cols = [c for c in feature_cols if c not in cols_to_drop]
 
     # -- Handle NULLs --
     # IMPORTANT: Do NOT fill numeric NaNs with 0 — LightGBM handles NaN

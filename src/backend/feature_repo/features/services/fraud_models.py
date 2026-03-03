@@ -8,8 +8,8 @@ from feast import FeatureService, FeatureView
 
 logger = logging.getLogger(__name__)
 
-from features.views.charges import charge_features, charge_stats_features
-from features.views.checkouts import checkout_features
+from features.views.charges import charge_features, charge_stats_features, card_features
+from features.views.checkouts import checkout_velocity_features
 from features.views.customers import customer_features, customer_profile_features
 from features.views.payment_intents import payment_intent_features, payment_intent_stats_features
 from features.views.addresses import address_features
@@ -24,7 +24,7 @@ from features.views.geo_time import geo_time_features
 ALL_VIEWS: list[FeatureView] = [
     charge_features,  # per-charge event: risk_score, card_brand, card_issuer
     charge_stats_features,  # expanding-window per-email: n_charges, failures, rate
-    checkout_features,  # checkout context: grade, sku, subscription_value
+    card_features,  # static per-card_fingerprint: brand, funding, cvc_check
     payment_intent_features,  # Stripe PI: amount, status, n_failures
     payment_intent_stats_features,  # aggregated PI history: n_intents, failures, success_rate
     customer_features,  # identity signals: name/email match scores, fiscal_code
@@ -33,6 +33,7 @@ ALL_VIEWS: list[FeatureView] = [
     store_features,  # store metadata: partner, province, area
     store_stats_features,  # expanding-window per-store: success_rate, avg_value
     geo_time_features,  # rolling geo-velocity + temporal (PIT-correct)
+    checkout_velocity_features,  # rolling checkout velocity: frequency, failures, category switching
 ]
 
 
@@ -83,6 +84,11 @@ _BASELINE_PRODUCTION_FEATURES = [
     # Rolling 30d request count captures regional attack surges without
     # permanently penalizing high-traffic provinces.
     "geo_time_features__province_n_requests_30d",
+    # -- Checkout velocity (behavioral patterns) --
+    # Repeated failures + category switching = strong card-testing signal.
+    "checkout_velocity_features__n_checkouts_7d",
+    "checkout_velocity_features__expired_ratio_7d",
+    "checkout_velocity_features__n_distinct_categories_30d",
 ]
 
 

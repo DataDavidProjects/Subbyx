@@ -60,3 +60,61 @@ checkout_features = FeatureView(
     ],
     source=checkout_features_source,
 )
+
+# ---------------------------------------------------------------------------
+# Checkout velocity (rolling-window behavioral signals)
+# ---------------------------------------------------------------------------
+
+checkout_velocity_source = FileSource(
+    path=str(_SOURCES_DIR / "checkout_velocity.parquet"),
+    timestamp_field="created",
+)
+
+checkout_velocity_features = FeatureView(
+    name="checkout_velocity_features",
+    entities=[email],
+    description="Rolling-window checkout velocity signals: frequency, failure patterns, category switching, value downtrade.",
+    schema=[
+        Field(
+            name="n_checkouts_7d",
+            dtype=Float64,
+            tags={
+                "label": "Checkouts (7d)",
+                "description": "Total checkouts by this email in the prior 7 days.",
+            },
+        ),
+        Field(
+            name="n_expired_7d",
+            dtype=Float64,
+            tags={
+                "label": "Expired Checkouts (7d)",
+                "description": "Expired (failed) checkouts by this email in the prior 7 days.",
+            },
+        ),
+        Field(
+            name="expired_ratio_7d",
+            dtype=Float64,
+            tags={
+                "label": "Expired Ratio (7d)",
+                "description": "Fraction of checkouts that expired in the prior 7 days (0 if none).",
+            },
+        ),
+        Field(
+            name="n_distinct_categories_30d",
+            dtype=Float64,
+            tags={
+                "label": "Distinct Categories (30d)",
+                "description": "Number of distinct product categories checked out in the prior 30 days.",
+            },
+        ),
+        Field(
+            name="max_value_30d",
+            dtype=Float64,
+            tags={
+                "label": "Max Subscription Value (30d)",
+                "description": "Maximum subscription value (€) across checkouts in the prior 30 days.",
+            },
+        ),
+    ],
+    source=checkout_velocity_source,
+)

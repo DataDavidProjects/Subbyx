@@ -11,6 +11,8 @@ from features.compute import (
     address_features,
     store_features,
     geo_time_features,
+    card_features,
+    checkout_velocity,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,8 +24,9 @@ MODULES = [
     ("checkout_features", checkout_features),
     ("address_features", address_features),
     ("store_features", store_features),
-    # Must run after customer + address features (depends on both)
     ("geo_time_features", geo_time_features),
+    ("card_features", card_features),
+    ("checkout_velocity", checkout_velocity),
 ]
 
 

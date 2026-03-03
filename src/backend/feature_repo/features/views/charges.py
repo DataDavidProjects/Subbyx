@@ -4,6 +4,7 @@ from feast import FeatureView, FileSource, Field
 from feast.types import String, Float64
 
 from features.entities.email import email
+from features.entities.card_fingerprint import card_fingerprint
 
 _SOURCES_DIR = Path(__file__).resolve().parents[2] / "data" / "sources"
 
@@ -23,22 +24,6 @@ charge_features = FeatureView(
             tags={
                 "label": "Stripe Risk Score",
                 "description": "Stripe's machine-learning risk score for the most recent charge (0–100). Higher values indicate higher fraud risk.",
-            },
-        ),
-        Field(
-            name="card_brand",
-            dtype=String,
-            tags={
-                "label": "Card Brand",
-                "description": "Payment card brand (e.g. Visa, Mastercard) used on the most recent charge.",
-            },
-        ),
-        Field(
-            name="card_issuer",
-            dtype=String,
-            tags={
-                "label": "Card Issuer",
-                "description": "Name of the bank or institution that issued the payment card.",
             },
         ),
     ],
@@ -81,4 +66,42 @@ charge_stats_features = FeatureView(
         ),
     ],
     source=charge_stats_source,
+)
+
+card_features_source = FileSource(
+    path=str(_SOURCES_DIR / "card_features.parquet"),
+    timestamp_field="created",
+)
+
+card_features = FeatureView(
+    name="card_features",
+    entities=[card_fingerprint],
+    description="Latest card attributes per card fingerprint.",
+    schema=[
+        Field(
+            name="card_brand",
+            dtype=String,
+            tags={
+                "label": "Card Brand",
+                "description": "Payment card brand (e.g. Visa, Mastercard).",
+            },
+        ),
+        Field(
+            name="card_funding",
+            dtype=String,
+            tags={
+                "label": "Card Funding",
+                "description": "Card funding type (e.g. credit, debit).",
+            },
+        ),
+        Field(
+            name="card_cvc_check",
+            dtype=String,
+            tags={
+                "label": "CVC Check Result",
+                "description": "Result of CVC verification check.",
+            },
+        ),
+    ],
+    source=card_features_source,
 )
