@@ -1,5 +1,5 @@
 selected_features:
-- geo_time_features__postal_n_frauds_5d
+- geo_time_features__postal_n_frauds_30d
 - geo_time_features__postal_fraud_rate_10d
 - geo_time_features__province_n_frauds_5d
 - customer_features__high_end_rate
@@ -10,23 +10,23 @@ selected_features:
 - payment_intent_stats_features__success_rate
 - payment_intent_stats_features__n_succeeded
 - geo_time_features__province_n_requests_60d
-- payment_intent_features__amount
 - checkout_velocity_features__max_value_30d
+- payment_intent_features__amount
 - charge_features__missing
-- checkout_velocity_features__n_distinct_categories_30d
 - checkout_velocity_features__n_checkouts_7d
-- charge_stats_features__failure_rate
 - subscription_value
 - checkout_velocity_features__expired_ratio_7d
+- checkout_velocity_features__n_distinct_categories_30d
 - geo_time_features__postal_n_requests_30d
+- charge_stats_features__failure_rate
 - charge_features__outcome_risk_score
 - is_high_risk_card
+- charge_stats_features__n_failures
 - is_smartphone_or_watch
 - store_stats_features__store_avg_value
-- customer_profile_features__is_address_mismatch
-- payment_intent_features__n_failures
-- payment_intent_stats_features__n_failures
-training_dir: /Users/davidelupis/Desktop/Subbyx/data/04-modeling/20260303-175045
+- is_storage_variant
+- geo_time_features__checkout_dow
+training_dir: /Users/davidelupis/Desktop/Subbyx/data/04-modeling/20260303-175818
 vif_threshold: 10.0
 mi_min_score: 0.01
 corr_threshold: 0.5

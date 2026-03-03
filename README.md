@@ -5,7 +5,23 @@ A real-time fraud detection system for checkout transactions.
 
 ## Quick Start
 
-### Local Development (no Docker)
+This example of repositori can be used as a template for building a fraud detection system, special Make commands are used to run the system locally.
+The system is composed of 3 services: backend, frontend and pipeline.
+
+Pipeline is a sequence of step to clean and present a flow of 2 models with arbitrary features in pseudo feature store ( local data offline store + redis online store + feast)
+
+Frontend is a rudimental UI admin tool to simulate potential processes of a real fraud detection system.
+
+Backend is a FastAPI fraud detection API that serves data, call feature store and call models.
+
+Additional service like Redis,MLFLOW,FEAST are running in the background
+
+The process is not meant to be used as is, rather as an example of how a fraud detection system can be grow and evolve.
+
+### Local Development
+
+Might have issues with network with compose up, if so use the following commands:
+
 ```bash
 # Terminal 1: Start backend + MLflow
 make dev-backend
@@ -386,3 +402,54 @@ graph LR
 | **Two-stage decision** | Rules engine (instant deterministic blocks) before ML model (score-based threshold). |
 | **Rules** | File-based, `@lru_cache`-backed. Each rule in `routes/fraud/rules/{rule_name}/` with its own data source. |
 | **Threshold optimization** | Per-segment thresholds in `routes/fraud/config.yaml`. NEW_CUSTOMER=x, RETURNING=y |
+
+
+
+
+# Subbyx Fraud Detection - Model Performance Report
+
+
+**Model Name:** `fraud-detector`  
+**Framework:** LightGBM + Feast + MLflow
+
+## 1. Executive Summary
+The latest training pipeline successfully processed 5,005 samples, resulting in a production-ready model and a shadow model. 
+
+
+## 2. Production Model (@production)
+*   **Feature Count:** 27
+*   **Training Set:** 2,245 samples (17.3% fraud)
+*   **Test Set:** 814 samples (12.0% fraud)
+
+### Performance Metrics
+| Metric | Validation | Test |
+| :--- | :--- | :--- |
+| **AUC-PR** | 0.8476 | 0.6072 |
+| **ROC-AUC** | 0.9264 | 0.8944 |
+
+---
+
+## 3. Shadow Model (@shadow)
+*   **Feature Count:** 8 (Lightweight)
+*   **Goal:** Provide a stable baseline with minimal feature dependencies.
+
+### Performance Metrics
+| Metric | Validation | Test |
+| :--- | :--- | :--- |
+| **AUC-PR** | 0.6732 | 0.2518 |
+| **ROC-AUC** | 0.7153 | 0.7422 |
+
+---
+
+
+Rule Performance Evaluation (on Test Set)
+================================================================================
+                     Rule   Triggered Precision Recall ROC AUC PR AUC
+                Blacklist    0 (0.0%)     0.000  0.000   0.500  0.120
+Stripe Risk (Score >= 90)    0 (0.0%)     0.000  0.000   0.500  0.120
+    Fiscal Code Duplicate  97 (11.9%)     0.041  0.041   0.455  0.117
+Payment Failure (Updated)   49 (6.0%)     0.469  0.235   0.599  0.202
+       Rules Engine (ALL) 146 (17.9%)     0.185  0.276   0.555  0.138
+================================================================================
+Note: Stripe Risk is evaluated using a score threshold proxy (>= 90).
+Note: Fiscal Code Duplicate uses the n_emails_per_fiscal_code feature.
