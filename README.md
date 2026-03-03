@@ -440,16 +440,16 @@ The latest training pipeline successfully processed 5,005 samples, resulting in 
 | **ROC-AUC** | 0.7153 | 0.7422 |
 
 ---
+## Rule Performance Evaluation (on Test Set)
 
+| Rule | Triggered | Precision | Recall | ROC AUC | PR AUC |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Blacklist** | 0 (0.0%) | 0.000 | 0.000 | 0.500 | 0.120 |
+| **Stripe Risk (Score >= 90)** | 0 (0.0%) | 0.000 | 0.000 | 0.500 | 0.120 |
+| **Fiscal Code Duplicate** | 97 (11.9%) | 0.041 | 0.041 | 0.455 | 0.117 |
+| **Payment Failure (Updated)** | 49 (6.0%) | 0.469 | 0.235 | 0.599 | 0.202 |
+| **Rules Engine (ALL)** | 146 (17.9%) | 0.185 | 0.276 | 0.555 | 0.138 |
 
-Rule Performance Evaluation (on Test Set)
-================================================================================
-                     Rule   Triggered Precision Recall ROC AUC PR AUC
-                Blacklist    0 (0.0%)     0.000  0.000   0.500  0.120
-Stripe Risk (Score >= 90)    0 (0.0%)     0.000  0.000   0.500  0.120
-    Fiscal Code Duplicate  97 (11.9%)     0.041  0.041   0.455  0.117
-Payment Failure (Updated)   49 (6.0%)     0.469  0.235   0.599  0.202
-       Rules Engine (ALL) 146 (17.9%)     0.185  0.276   0.555  0.138
-================================================================================
-Note: Stripe Risk is evaluated using a score threshold proxy (>= 90).
-Note: Fiscal Code Duplicate uses the n_emails_per_fiscal_code feature.
+**Notes:**
+* *Stripe Risk is evaluated using a score threshold proxy (>= 90).*
+* *Fiscal Code Duplicate uses the n_emails_per_fiscal_code feature.*

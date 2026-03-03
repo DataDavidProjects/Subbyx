@@ -121,16 +121,21 @@ def get_features(**entities: str) -> dict:
     t0 = time.perf_counter()
 
     # 1. Map entities to their relevant feature views in the service
-    entity_to_views: dict[str, list] = {}
+    entity_to_features: dict[str, list[str]] = {}
     for projection in feature_service.feature_view_projections:
         fv = store.get_feature_view(projection.name)
+        if not fv:
+            continue
         for ent in fv.entities:
             ent_name = ent if isinstance(ent, str) else ent.name
             if ent_name in entities and entities[ent_name]:
-                entity_to_views.setdefault(ent_name, []).append(projection)
+                # Get feature names for THIS projection (respecting the service's selection)
+                # projection.features is a list of Field objects.
+                feature_refs = [f"{projection.name}:{f.name}" for f in projection.features]
+                entity_to_features.setdefault(ent_name, []).extend(feature_refs)
 
     # 2. Perform one lookup per entity that we actually have a value for
-    for ent_name, projections in entity_to_views.items():
+    for ent_name, feature_refs in entity_to_features.items():
         val = entities[ent_name]
         if not val or val == "nan":
             continue
@@ -138,7 +143,7 @@ def get_features(**entities: str) -> dict:
         try:
             # Prepare request with timestamp if available
             lookup_kwargs = {
-                "features": projections,
+                "features": feature_refs,
                 "entity_rows": [{ent_name: val}],
                 "full_feature_names": True,
             }
