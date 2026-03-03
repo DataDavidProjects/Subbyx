@@ -22,6 +22,15 @@ REQUEST_FEATURE_SCHEMA: dict[str, dict[str, Any]] = {
     "is_storage_variant": {"field": None, "default": False, "dtype": "bool"},
     "is_smartphone_or_watch": {"field": None, "default": False, "dtype": "bool"},
     "category_risk_tier": {"field": None, "default": "low", "dtype": "str"},
+    # Card risk features for cold start (derived from checkout context)
+    "card_brand": {"field": "card_brand", "default": "", "dtype": "str"},
+    "card_funding": {"field": "card_funding", "default": "", "dtype": "str"},
+    "card_cvc_check": {"field": "card_cvc_check", "default": "", "dtype": "str"},
+    "is_debit_card": {"field": None, "default": False, "dtype": "bool"},
+    "is_prepaid_card": {"field": None, "default": False, "dtype": "bool"},
+    "is_high_risk_card": {"field": None, "default": False, "dtype": "bool"},
+    "card_cvc_fail": {"field": None, "default": False, "dtype": "bool"},
+    "card_cvc_unavailable": {"field": None, "default": False, "dtype": "bool"},
 }
 
 
@@ -89,5 +98,38 @@ def extract_request_features(ctx: CheckoutContext) -> dict[str, Any]:
         features["category_risk_tier"] = "medium"
     else:
         features["category_risk_tier"] = "low"
+
+    # 6. Derived: card risk features for cold start (initialize with defaults)
+    features["is_debit_card"] = REQUEST_FEATURE_SCHEMA["is_debit_card"]["default"]
+    features["is_prepaid_card"] = REQUEST_FEATURE_SCHEMA["is_prepaid_card"]["default"]
+    features["is_high_risk_card"] = REQUEST_FEATURE_SCHEMA["is_high_risk_card"]["default"]
+    features["card_cvc_fail"] = REQUEST_FEATURE_SCHEMA["card_cvc_fail"]["default"]
+    features["card_cvc_unavailable"] = REQUEST_FEATURE_SCHEMA["card_cvc_unavailable"]["default"]
+
+    card_funding = str(ctx.card_funding).lower().strip() if ctx.card_funding else ""
+    card_cvc = str(ctx.card_cvc_check).lower().strip() if ctx.card_cvc_check else ""
+
+    # Card funding type risk (based on historical analysis)
+    # Debit cards: 9.0% fraud rate (highest)
+    # Prepaid cards: 4.5% fraud rate
+    # Credit cards: 2.7% fraud rate (lowest)
+    features["is_debit_card"] = card_funding == "debit"
+    features["is_prepaid_card"] = card_funding == "prepaid"
+
+    # CVC check risk indicators
+    # fail: highest risk (but rare)
+    # unavailable: slightly elevated risk
+    features["card_cvc_fail"] = card_cvc == "fail"
+    features["card_cvc_unavailable"] = card_cvc == "unavailable"
+
+    # Composite high-risk card indicator
+    # Debit cards are highest risk (9% vs 2.7% for credit)
+    # CVC check failures are also high risk
+    # CVC unavailable is elevated risk regardless of card type
+    features["is_high_risk_card"] = (
+        features["is_debit_card"] or
+        features["card_cvc_fail"] or
+        features["card_cvc_unavailable"]
+    )
 
     return features

@@ -35,7 +35,10 @@ def mock_checkout_context():
         has_high_end_device=True,
         subscription_value=100.0,
         grade="A",
-        category="test"
+        category="test",
+        card_brand="visa",
+        card_funding="credit",
+        card_cvc_check="pass",
     )
 
 

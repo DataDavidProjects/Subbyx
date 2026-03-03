@@ -20,6 +20,9 @@ selected_features:
 - store_stats_features__store_avg_value
 - is_storage_variant
 - payment_intent_stats_features__n_failures
+- customer_features__email_emails_match_score
+- customer_profile_features__is_address_mismatch
+- customer_profile_features__n_emails_per_fiscal_code
 training_dir: /Users/davidelupis/Desktop/Subbyx/data/04-modeling/20260303-005554
 vif_threshold: 10.0
 mi_min_score: 0.01
