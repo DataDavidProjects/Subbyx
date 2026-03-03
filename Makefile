@@ -11,11 +11,32 @@
         redis feast-apply feast-materialize feast-restart feast-reset feast-status feast-ui feast-verify \
         dev-backend dev-frontend dev mlflow model-register \
         train train-production train-shadow train-all \
-        test
+        test test-checkout
 
 # Default dates for materialize
 START ?= 2024-01-01
 END ?= 2025-01-01
+
+# Default payload for test-checkout
+DEFAULT_CHECKOUT_PAYLOAD := '{ \
+  "checkout_id": "test_chk_001", \
+  "customer_id": "test_cust_123", \
+  "email": "test@example.com", \
+  "checkout_data": {}, \
+  "timestamp": "2024-01-01T12:00:00Z", \
+  "customer_name": "John Doe", \
+  "document_name": "ID-999", \
+  "account_name": "jdoe_acc", \
+  "has_high_end_device": true, \
+  "fiscal_code": "RSSMRA80A01H501U", \
+  "gender": "M", \
+  "birth_date": "1980-01-01", \
+  "birth_province": "MI", \
+  "birth_country": "IT", \
+  "card_fingerprint": "fp_abc123" \
+}'
+
+PAYLOAD ?= $(DEFAULT_CHECKOUT_PAYLOAD)
 
 # Default Redis host for Feast online store (overridden by docker-compose)
 export FEAST_REDIS_HOST ?= localhost:6379
@@ -81,6 +102,10 @@ help:
 	@echo "  make train-production       - Train production model"
 	@echo "  make train-shadow           - Train shadow model"
 	@echo "  make train-all              - Train both production and shadow"
+	@echo ""
+	@echo "Validation:"
+	@echo "  make test-checkout          - Test checkout endpoint with curl"
+	@echo "  make test-checkout PAYLOAD='{...}' - Test with custom payload"
 
 # Install all project dependencies
 install:
@@ -318,6 +343,15 @@ train-shadow:
 train-all:
 	$(MAKE) train-production
 	$(MAKE) train-shadow
+
+# Validation
+test-checkout:
+	@echo "Testing fraud checkout endpoint..."
+	curl -X 'POST' \
+	  'http://127.0.0.1:8001/fraud/v1/checkout' \
+	  -H 'accept: application/json' \
+	  -H 'Content-Type: application/json' \
+	  -d $(PAYLOAD)
 
 # Threshold optimization for segments
 threshold-optimize:

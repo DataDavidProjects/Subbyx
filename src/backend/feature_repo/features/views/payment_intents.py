@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 
 from feast import FeatureView, FileSource, Field
@@ -15,6 +16,7 @@ payment_intent_features_source = FileSource(
 payment_intent_features = FeatureView(
     name="payment_intent_features",
     entities=[email],
+    ttl=timedelta(0),
     description="Payment intent attributes for the most recent transaction attempt.",
     schema=[
         Field(
@@ -61,6 +63,7 @@ payment_intent_stats_source = FileSource(
 payment_intent_stats_features = FeatureView(
     name="payment_intent_stats_features",
     entities=[email],
+    ttl=timedelta(0),
     description="Aggregated payment intent history statistics per customer email.",
     schema=[
         Field(

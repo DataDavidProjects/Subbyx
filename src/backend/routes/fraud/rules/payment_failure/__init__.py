@@ -30,12 +30,9 @@ def check_payment_failure(
 ) -> tuple[bool, str]:
     """Return (triggered, reason) if the payment failure rule fires.
 
-    Only applies to RETURNING customers (new customers have no history).
-    Checks both charge and payment-intent failure rates.
-    """
-    if segment != "RETURNING":
-        return False, ""
+    Checks both charge and payment-intent failure rates across all segments.
 
+    """
     checks: list[tuple[str, str, str]] = [
         (
             "payment_intent_stats_features__failure_rate",
@@ -50,8 +47,15 @@ def check_payment_failure(
     ]
 
     for rate_key, count_key, label in checks:
+        # Check both the prefixed key (from get_features) and the
+        # base key if the prefix is missing.
         rate = features.get(rate_key)
+        if rate is None:
+            rate = features.get(rate_key.split("__")[-1])
+
         count = features.get(count_key)
+        if count is None:
+            count = features.get(count_key.split("__")[-1])
 
         if rate is None or count is None:
             continue

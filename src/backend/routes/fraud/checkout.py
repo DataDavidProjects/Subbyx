@@ -249,25 +249,25 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
         fiscal_code=ctx.fiscal_code,
     )
 
-    # 3a. Payment failure rate check (pre-model rule for RETURNING customers)
-    # Uses the features fetched in Step 3, but runs BEFORE model scoring
-    if segment == "RETURNING":
-        from routes.fraud.rules.payment_failure import check_payment_failure
+    # 3a. Payment failure rate check (pre-model rule)
+    # Uses the features fetched in Step 3, but runs BEFORE model scoring.
+    # Now applies to ALL segments to catch high-risk 'new' customers with attempt history.
+    from routes.fraud.rules.payment_failure import check_payment_failure
 
-        pf_triggered, pf_reason = check_payment_failure(feast_features, segment)
-        if pf_triggered:
-            logger.info(
-                "[BACKEND] Step 3a: PAYMENT_FAILURE rule triggered (segment=%s)",
-                segment,
-            )
-            return CheckoutResponse(
-                decision="BLOCK",
-                reason=pf_reason,
-                rule_triggered="payment_failure",
-                score=None,
-                segment=segment,
-                segment_reason=segment_reason,
-            )
+    pf_triggered, pf_reason = check_payment_failure(feast_features, segment)
+    if pf_triggered:
+        logger.info(
+            "[BACKEND] Step 3a: PAYMENT_FAILURE rule triggered (segment=%s)",
+            segment,
+        )
+        return CheckoutResponse(
+            decision="BLOCK",
+            reason=pf_reason,
+            rule_triggered="payment_failure",
+            score=None,
+            segment=segment,
+            segment_reason=segment_reason,
+        )
 
     # 4. Merge request features and align with model prefixes
     request_features = extract_request_features(ctx)

@@ -84,7 +84,12 @@ def _from_feast(entity: str, key: str) -> dict:
 
 
 def get_features(**entities: str) -> dict:
-    """Fetch all features from Feast online store using a single lookup row.
+    """Fetch all features from Feast online store by performing lookups
+    for each provided entity key and merging results.
+
+    This avoids the 'Missing join key values' KeyError that occurs when
+    a FeatureService combines views with different entities but the
+    lookup row doesn't contain all of them.
 
     Args:
         **entities: Entity key-value pairs (email, customer_id, store_id, etc.)
@@ -100,58 +105,84 @@ def get_features(**entities: str) -> dict:
     if feature_service is None:
         return {}
 
-    # 1. Build a single entity row with all provided keys
-    # Clean up empty values and non-required entities
-    # If a required entity is missing, use a placeholder so Feast lookup doesn't fail
-    required_entities = _get_required_entities()
-    entity_row = {}
-    for name in required_entities:
-        val = entities.get(name)
-        if val is None or val == "" or val == "nan":
-            val = "__UNKNOWN__"
-        entity_row[name] = val
-
-    if not entity_row:
-        logger.warning("No valid entity keys provided for Feast lookup. Entities=%s", entities)
-        return {}
-
+    results = {}
     t0 = time.perf_counter()
-    try:
-        # Fetch features for the whole service in one go
-        response = store.get_online_features(
-            features=feature_service,
-            entity_rows=[entity_row],
-            full_feature_names=True,
-        )
-        elapsed_ms = (time.perf_counter() - t0) * 1000
 
-        data = response.to_dict()
-        results = {}
-        for feat_name, values in data.items():
-            if feat_name in required_entities:
-                continue
-            val = values[0] if values else None
-            # Convert NaN to None for JSON serialization
-            import math
+    # 1. Map entities to their relevant feature views in the service
+    # so we only perform necessary lookups.
+    entity_to_views: dict[str, list] = {}
+    for projection in feature_service.feature_view_projections:
+        fv = store.get_feature_view(projection.name)
+        for ent in fv.entities:
+            ent_name = ent if isinstance(ent, str) else ent.name
+            if ent_name in entities and entities[ent_name]:
+                entity_to_views.setdefault(ent_name, []).append(projection)
 
-            if isinstance(val, float) and math.isnan(val):
-                val = None
-            results[feat_name] = val
+    # 2. Perform one lookup per entity that we actually have a value for
+    for ent_name, projections in entity_to_views.items():
+        val = entities[ent_name]
+        if not val or val == "nan":
+            continue
 
-        logger.info(
-            "Feast lookup service=%s entities=%s: %d features (%.1fms)",
-            FEATURE_SERVICE_NAME,
-            list(entity_row.keys()),
-            len(results),
-            elapsed_ms,
-        )
-        return results
+        try:
+            response = store.get_online_features(
+                features=projections,
+                entity_rows=[{ent_name: val}],
+                full_feature_names=True,
+            )
+            data = response.to_dict()
+            for feat_name, values in data.items():
+                if feat_name == ent_name:
+                    continue
+                val_out = values[0] if values else None
+                import math
+                if isinstance(val_out, float) and math.isnan(val_out):
+                    val_out = None
+                
+                # Only overwrite if the new value is NOT null, 
+                # or if we don't have a value yet.
+                if val_out is not None or feat_name not in results:
+                    results[feat_name] = val_out
 
-    except Exception as exc:
-        logger.error(
-            "Failed Feast lookup for service=%s entities=%s: %s",
-            FEATURE_SERVICE_NAME,
-            entity_row,
-            exc,
-        )
-        return {}
+        except Exception as exc:
+            logger.error("Feast lookup failed for entity %s=%s: %s", ent_name, val, exc)
+
+    # 3. Add extra features needed by Rules Engine if missing
+    # (Similar to step 2 in previous version, but using individual lookups)
+    extra_rule_fields = {
+        "email": [
+            "charge_stats_features:n_charges",
+            "charge_stats_features:n_failures",
+            "charge_stats_features:failure_rate",
+            "payment_intent_stats_features:n_payment_intents",
+            "payment_intent_stats_features:n_failures",
+            "payment_intent_stats_features:failure_rate",
+        ]
+    }
+    
+    for ent_name, fields in extra_rule_fields.items():
+        if ent_name in entities and entities[ent_name]:
+            try:
+                response = store.get_online_features(
+                    features=fields,
+                    entity_rows=[{ent_name: entities[ent_name]}],
+                    full_feature_names=True,
+                )
+                data = response.to_dict()
+                for feat_name, values in data.items():
+                    if feat_name == ent_name: continue
+                    val_out = values[0] if values else None
+                    if val_out is not None or feat_name not in results:
+                        results[feat_name] = val_out
+            except Exception:
+                pass
+
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    logger.info(
+        "Feast multi-lookup service=%s entities=%s: %d features (%.1fms)",
+        FEATURE_SERVICE_NAME,
+        list(entities.keys()),
+        len(results),
+        elapsed_ms,
+    )
+    return results

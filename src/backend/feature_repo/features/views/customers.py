@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 
 from feast import FeatureView, FileSource, Field
@@ -15,6 +16,7 @@ customer_features_source = FileSource(
 customer_features = FeatureView(
     name="customer_features",
     entities=[customer_id],
+    ttl=timedelta(0),
     description="Base identity attributes for the customer.",
     schema=[
         Field(
@@ -85,6 +87,7 @@ customer_profile_source = FileSource(
 customer_profile_features = FeatureView(
     name="customer_profile_features",
     entities=[customer_id],
+    ttl=timedelta(0),
     description="Derived behavioral and anomaly profile features per customer.",
     schema=[
         Field(

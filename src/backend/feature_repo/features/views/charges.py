@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 
 from feast import FeatureView, FileSource, Field
@@ -16,6 +17,7 @@ charge_features_source = FileSource(
 charge_features = FeatureView(
     name="charge_features",
     entities=[email],
+    ttl=timedelta(0),
     description="Latest charge attributes for the customer's email.",
     schema=[
         Field(
@@ -38,6 +40,7 @@ charge_stats_source = FileSource(
 charge_stats_features = FeatureView(
     name="charge_stats_features",
     entities=[email],
+    ttl=timedelta(0),
     description="Aggregated charge history statistics per customer email.",
     schema=[
         Field(
@@ -76,6 +79,7 @@ card_features_source = FileSource(
 card_features = FeatureView(
     name="card_features",
     entities=[card_fingerprint],
+    ttl=timedelta(0),
     description="Latest card attributes per card fingerprint.",
     schema=[
         Field(
