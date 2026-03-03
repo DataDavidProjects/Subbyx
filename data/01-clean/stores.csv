@@ -1,0 +1,115 @@
+Unnamed: 0,name,store_id,partner_name,store_name,address,zip,state,province,area
+0,subbyx,subbyxb2c,subbyx,Subbyx,subbyx,,,,unknown
+1,euronics_butali_montecatini,439,euronics,Euronics Montecatini,"Via Biscolla 48, Massa e Cozzile (PT) 51010 ",51010.0,Toscana,Pistoia,center
+2,euronics_butali_grosseto,465,euronics,Euronics Grosseto,"Via Cile Loc.Tà Commendone (Centro Comm. Maremà), Grosseto 58100",58100.0,Toscana,Grosseto,center
+3,euronics_butali_corciano,463,euronics,Euronics Corciano,"Centro Comm. Quasar, Via Aldo Capitini 8, Corciano (PG) 06073",6073.0,Umbria,Perugia,center
+4,irapido_euroma2,euroma2,irapido,iRapido Euroma2,"Viale dell'Oceano Pacifico 83, Roma (RM) 00144",144.0,Lazio,Roma,center
+5,irapido_tuscolana,irapido_tuscolana,irapido,iRapido Tuscolana,"Via Tuscolana 1182, Roma (RM) 00174",174.0,Lazio,Roma,center
+6,irapido_appia,irapido_appia,irapido,iRapido Appia,"Via Appia Nuova 96, Roma (RM) 00183",183.0,Lazio,Roma,center
+7,irapido_libia,irapido_libia,irapido,iRapido Libia,"Viale Libia 108, Roma (RM) 00199",199.0,Lazio,Roma,center
+8,butali_euronics_firenze_v.le_dei_mille,101,euronics,Euronics Viale dei mille,"Viale dei Mille 140, Firenze 50131",50131.0,Toscana,Firenze,center
+9,butali_euronics_arezzo_san_zeno,306,euronics,Euronics Arezzo,"Strada D 1, San Zeno (Arezzo) 52100",52100.0,Toscana,Arezzo,center
+10,butali_euronics_sinalunga,404,euronics,Euronics Sinalunga,"Centro Commerciale I Gelsi, Via Casalpiano, 1, Sinalunga 53048",53048.0,Toscana,Siena,center
+11,butali_euronics_lucca,418,euronics,Euronics Lucca,"Via C. Del Prete, Lucca 55100",55100.0,Toscana,Lucca,center
+12,butali_euronics_firenze_via_di_novoli,419,euronics,Euronics Firenze Via di novoli,"Via di Novoli 22, Firenze 50127",50127.0,Toscana,Firenze,center
+13,butali_euronics_massa,423,euronics,Euronics Massa,"Via Marina Vecchia 222, Massa 54100",54100.0,Toscana,Massa-Carrara,center
+14,butali_euronics_citta_di_castello,426,euronics,Euronics città di castello,"Centro Comm. Cross, Via Piero della Francesca 17, Citta di castello 6012",6012.0,Umbria,Perugia,center
+15,butali_euronics_setteponti_ar,431,euronics,Euronics Setteponti,V.le Giovanni Amendola Arezzo 52100,52100.0,Toscana,Arezzo,center
+16,butali_euronics_bibbiena,434,euronics,Euronics Bibbiena,"località Palazzetto Centro Commerciale Il Casentino, Bibbiena 52011",52011.0,Toscana,Arezzo,center
+17,butali_euronics_sesto_fiorentino,437,euronics,Euronics Sesto fiorentino,"Via Petrosa 19, Sesto fiorentino 50019",50019.0,Toscana,Firenze,center
+18,butali_euronics_pontedera,441,euronics,Euronics Pontedera,"Via Tosco Romagnola 21, Pontedera 56025",56025.0,Toscana,Pisa,center
+19,butali_euronics_orbetello,442,euronics,Euronics Orbetello,"Via Aurelia Km 145, Orbetello 58016",58016.0,,,unknown
+20,butali_euronics_navacchio,444,euronics,Euronics Navacchio,"Via del Fosso Vecchio 457, Navacchio 56023",56023.0,Toscana,Pisa,center
+21,butali_euronics_sarzana,446,euronics,Euronics Navacchio,"Via Variante Cisa 57, Sarzana 19038",19038.0,Liguria,La Spezia,north
+22,butali_euronics_firenze_centro_comm.le_gavina,447,euronics,Euronics Firenze Gavina,"Centro Comm. Coop Gavinana Centro Commerciale Coop, Viale Donato Giannotti, Firenze 50126",50126.0,Toscana,Firenze,center
+23,butali_euronics_marsciano,448,euronics,Eruronics Marsciano,"Parco Comm.Cross Conad, Viale Fratelli Briziarelli 11, Marsciano 6055",6055.0,Umbria,Perugia,center
+24,butali_euronics_trevi_centro_comm.le_piazzaum,450,euronics,Euronics Trevi Piazza Umbra,"SS3, Km 147, Trevi 6039",6039.0,Umbria,Perugia,center
+25,butali_euronics_prato,454,euronics,Euronics Prato,"O Parco Prato Coop, Via delle Pleiadi 87, Prato 59100",59100.0,Toscana,Prato,center
+26,butali_euronics_siena,455,euronics,Euronics Siena,"Str. Massetana Romana 62, Siena 53100",53100.0,Toscana,Siena,center
+27,butali_euronics_follonica,456,euronics,Euronics Follonica,"SP152, Follonica 58022",58022.0,Toscana,Grosseto,center
+28,butali_euronics_montevarchi,459,euronics,Euronics Montevarchi,"Viale Cadorna 42, Montevarchi 52025",52025.0,Toscana,Arezzo,center
+29,butali_euronics_piombino,460,euronics,Eruonics Piombino,"Via Gori Ang, Via Andrea Costa 1, Piombino 57025",57025.0,Toscana,Livorno,center
+30,butali_euronics_lastr_a_signa,462,euronics,Euronics Lastra a Signa,"Via Santa Maria a Castagnolo, Lastra a Signa(FI) 50055",50055.0,Toscana,Firenze,center
+31,butali_euronics_livorno_parco_levante,464,euronics,Euronics Livorno Parco Levante,"Via Giovanni Gelati Parco Comm. Levante, int. 10, Livorno 57128",57128.0,Toscana,Livorno,center
+32,butali_euronics_viareggio,466,euronics,Euronics Viareggio,"Via Pisana (P.Co Comm. Burlamacca), Viareggio 55049",55049.0,Toscana,Lucca,center
+33,butali_euronics_osimo,468,euronics,Euronics Osimo,"Centro Comm. Cargopier, Via della Sbrozzola 28, Osimo 60027",60027.0,Marche,Ancona,center
+34,butali_euronics_terni,469,euronics,Euronics Terni,"Centro Comm.""Cospea Village, Via Montefiorino 48, Terni 05100",5100.0,Umbria,Terni,center
+35,butali_euronics_livorno_c.c._fonti_del_corall,470,euronics,Euronis Livorno Fonti del corallo,"Comm. Fonti Del Corallo, Via Gino Graziani, 6C, Livorno 57121",57121.0,Toscana,Livorno,center
+36,butali_euronics_arezzo_viale_mecenate,471,euronics,Euronics Arezzo Mecenate,"Viale Mecenate 2, Arezzo 52100",52100.0,Toscana,Arezzo,center
+37,butali_euronics_cecina_centro_comm.le_corte_a,472,euronics,Euronics Cecina ,"P.Co Comm.Le Corte Acquerta, San Pietro In Palazzi Cecina 57023",57023.0,Toscana,Livorno,center
+38,butali_euronics_bologna_centro_comm._vialarga,473,euronics,Euronics Bologna Vialarga,"Centro Comm, Via Larga 10, Bologna 40138",40138.0,Emilia-Romagna,Bologna,north
+39,butali_euronics_sansepolcro,474,euronics,Euronics Sansepolcro,"Via Senese Aretina, 201 Sansepolcro 52037",52037.0,Toscana,Arezzo,center
+40,butali_euronics_forli,475,euronics,Euoronics Forlì,"Via Argentina Altobelli 22, Forlì 47122",47122.0,Emilia-Romagna,Forlì-Cesena,north
+41,subbyx_bo,subbyx_bo,subbyx,subbyx,subbyx,,,,unknown
+42,garmin_test,garmin_test,garmin,garmin,na,,,,unknown
+43,mas_tecnologie_legnano,mas_tecnologie_legnano,onedistribution_mas_tecnologie_legnano,Mastecnlogie Legnano,LEGNANO (MI) CORSO MAGENTA 77/A CAP 20025,20025.0,Lombardia,Milano,north
+44,call_position_paderno,call_position_paderno,onedistribution_call_position_paderno,Call position Paderno ,PADERNO DUGNANO (MI) VIA ROTONDI 5 CAP 20037,20037.0,Lombardia,Milano,north
+45,difix_limbiate,difix_limbiate,onedistribution_difix_limbiate,DiFix Limbiate,via Missori 1 Limbiate (MB) 20812,20812.0,Lombardia,Monza e della Brianza,north
+46,cosmotech_2_monza,cosmotech_2_monza,onedistribution_cosmotech_2_monza,Cosmotech Monza,"C.so Milano, 46 - 20900 - Monza (MB)",20900.0,Lombardia,Monza e della Brianza,north
+47,cosmotech_merate,cosmotech_merate,onedistribution_cosmotech_merate,Cosmotech Merate,"Via Bergamo, 19 - 23807 -  Merate (LC)",23807.0,Lombardia,Lecco,north
+48,greentech_legnano,greentech_legnano,onedistribution_greentech_legnano,GreenTech Legnano,"Corso Magenta, 40, 20025 Legnano (MI)",20025.0,Lombardia,Milano,north
+49,one_distribution_cormano,one_distribution_cormano,onedistribution,One Distribution,Cormano 20032 MI via Cantinotti 7,20032.0,Lombardia,Milano,north
+50,puntotel_montefiore,puntotel_montefiore,onedistribution_puntotel,One Distribution Montefiore,"P.le B.Croce,6 47921 Rimini (RN)",47921.0,Emilia-Romagna,Rimini,north
+51,puntotel_lungosavio,puntotel_lungosavio,onedistribution_puntotel,One Distribution Lungosavio,"Via A.C.Jemolo,110 47521 Cesena (FC)",47521.0,Emilia-Romagna,Forlì-Cesena,north
+52,puntotel_rimini,puntotel_rimini,onedistribution_puntotel,Puntotel rimini,"P.le B.Croce,6 47921 Rimini (RN)",47921.0,Emilia-Romagna,Rimini,north
+53,cicli_argentin,cicli_argentin,garmin_cicli_argentin,Cicli Argentini,"Borgo Vicenza, 54, 31033, TV",31033.0,Veneto,Treviso,north
+54,all_4_cycling,all_4_cycling,garmin_all_4_cycling,All 4 Cycling,"Via Professor Gianfranco Miglio, 2, 21045",21045.0,Lombardia,Varese,north
+55,cicli_drigani,cicli_drigani,garmin_cicli_drigani,Cicli Drigani,"Via Lanzo, 207, 10071 Borgaro Torinese TO",10071.0,Piemonte,Torino,north
+56,cicli_esposito,cicli_esposito,garmin_cicli_esposito,Cicli Esposito,"Via Carlo de Angeli, 3, 20141 Milano MI",20141.0,Lombardia,Milano,north
+57,cicli_francesconi,cicli_francesconi,garmin_cicli_francesconi,Cicli Francesconi,"Via Libertà, 27, 26010 Salvirola CR",26010.0,Lombardia,Cremona,north
+58,mio_mio_run,mio_mio_run,garmin_mio_mio_run,Mio Mio Run,"Via Venezia, 16/18, 31020 San Vendemiano TV",31020.0,Veneto,Treviso,north
+59,gialdini,gialdini,garmin_gialdini,Gialdini,"Via Triumplina, 45, 25123 Brescia BS",25123.0,Lombardia,Brescia,north
+60,podio_sport,podio_sport,garmin_podio_sport,Podio Sport,"Via Valle Po, 99, 12100 Cuneo CN",12100.0,Piemonte,Cuneo,north
+61,pro_m,pro_m,garmin_pro_m,Pro M,"Via Gallarate, 108, 20151 Milano MI",20151.0,Lombardia,Milano,north
+62,sportissimo,sportissimo,garmin_sportissimo,Sportissimo,"Str. San Faustino, 132, 41124 Modena MO",41124.0,Emilia-Romagna,Modena,north
+63,cicli_neri,cicli_neri,garmin_cicli_neri,Cicli Neri,"Via Ferruccio Parri, 641, 47522 Cesena FC",47522.0,Emilia-Romagna,Forlì-Cesena,north
+64,macino_elettronica,macino_elettronica,macino,Macino,"Via Monfalcone, 11/15 89013 Gioia Tauro (RC)",89013.0,Calabria,Reggio Calabria,south
+65,cdr_mobile_besnate,cdr_mobile_besnate,cdr_mobile_besnate,CDR Mobile Besnate,Via Bernini 1/A - 21010 Besnate (VA),21010.0,Lombardia,Varese,north
+66,rtsistem,rtsistem,onedistribution_rtsistem,RT Sistem,"Via Fradaletto 31, Venezia(Mestre), 30173",30173.0,Veneto,Venezia,north
+67,butali_euronics_rieti,476,euronics,Euronics Rieti,"via Mercatanti, loc. giardino, Rieti",,,,unknown
+68,euronics_dimo_casale,1,euronics_dimo,Euronics Casale,"Viale Cavalli D'Olivola 6, 15033 CASALE MONFE",15033.0,Piemonte,Alessandria,north
+69,euronics_dimo_novara,2,euronics_dimo,Euronics Novara,"Via Giovanni Gnifetti, 70, 28100 NOVARA",28100.0,Piemonte,Novara,north
+70,euronics_dimo_vercelli,3,euronics_dimo,Euronics Vercelli,Tangenziale Ovest Compartimento Sud Parco Com,,,,unknown
+71,euronics_dimo_alessandria,4,euronics_dimo,Euronics Alessandria,"Via Marengo, 64, 15121 ALESSANDRIA",15121.0,Piemonte,Alessandria,north
+72,euronics_dimo_biella,7,euronics_dimo,Euronics Biella,"Viale Luigi Tenco, 13900 BIELLA",13900.0,Piemonte,Biella,north
+73,euronics_dimo_torino_due,11,euronics_dimo,Euronics Torino 2,"Via Nizza, 30E, 10125 TORINO",10125.0,Piemonte,Torino,north
+74,euronics_dimo_tortona,12,euronics_dimo,Euronics Tortona,"Strada Provinciale per Viguzzolo, 2, 15057 TO",15057.0,Piemonte,Alessandria,north
+75,euronics_dimo_verbania_f,13,euronics_dimo,Euronics Verbania,"Viale Giuseppe Azari, 94, 28922 VERBANIA",28922.0,Piemonte,Verbano-Cusio-Ossola,north
+76,euronics_dimo_cuneo_due,14,euronics_dimo,Euoronics Cuneo,"Via Cascina Colombaro, 26, 12100 CUNEO",12100.0,Piemonte,Cuneo,north
+77,euronics_dimo_genova,15,euronics_dimo,Euronics Genova,"Via Romairone 10, 16163 GENOVA",16163.0,Liguria,Genova,north
+78,euronics_dimo_cuneo_tre,16,euronics_dimo,Euronics Cuneo San Giuseppe,"Via Margarita, 8, 12100 BORGO SAN GIUSEPPE (C",12100.0,Piemonte,Cuneo,north
+79,euronics_dimo_arma_di_taggia,17,euronics_dimo,Euronics Arma di taggia,"Via del Piano Parco Comm.le, 18018 ARMA DI TA",18018.0,Liguria,Imperia,north
+80,euronics_dimo_aosta,18,euronics_dimo,Euronics Aosta,"Località Le Grand Chemin, 38, 11020 SAINT CHR",11020.0,Valle d'Aosta,Aosta,north
+81,euronics_dimo_alba,19,euronics_dimo,Euronics Alba,"Corso Asti, 24, 12051 ALBA (CN)",12051.0,Piemonte,Cuneo,north
+82,euronics_dimo_mondovi,20,euronics_dimo,Euronics Mondovì,"Piazza Mondovicino, 42, 12084 MONDOVI' (CN)",12084.0,Piemonte,Cuneo,north
+83,euronics_dimo_rivalta,21,euronics_dimo,Euronics Rivalta di Torino,"Centro Comm. Rivalta, 10040 RIVALTA DI TORINO",10040.0,Piemonte,Torino,north
+84,euronics_dimo_torino_tre,22,euronics_dimo,Euronics Torino 3,"Strada Altessano,141, 10151 TORINO",10151.0,Piemonte,Torino,north
+85,euronics_dimo_savona,23,euronics_dimo,Euronics Savona,Via Stalingrado Centro Polifunzionale Le Offi,,,,unknown
+86,euronics_dimo_ivrea,24,euronics_dimo,Euronics Ivrea,"Via Uscello, 3, 10010 BANCHETTE (TO)",10010.0,Piemonte,Torino,north
+87,euronics_dimo_reggio_emilia,26,euronics_dimo,Euronics Reggio emilia,"Viale Regina Elena, 15, 42124 REGGIO EMILIA",42124.0,Emilia-Romagna,Reggio Emilia,north
+88,euronics_dimo_modena,27,euronics_dimo,Euronics Modena,"Strada Morane, 500, 41121 MODENA",41121.0,Emilia-Romagna,Modena,north
+89,euronics_dimo_carmagnola,28,euronics_dimo,Euronics Carmagnola,"Via Sommariva, 19/1, 10022 CARMAGNOLA (TO)",10022.0,Piemonte,Torino,north
+90,euronics_dimo_dalmine,29,euronics_dimo,Euronics Dalmine,"Via Roggia Serio Grande, 14, 24044 DALMINE (B",24044.0,Lombardia,Bergamo,north
+91,euronics_dimo_asti,30,euronics_dimo,Euronics Asti,"C.so Alessandria, 272, 14100 ASTI",14100.0,Piemonte,Asti,north
+92,euronics_dimo_parma_due,31,euronics_dimo,Euronics Parma,"Via Napoleone Colajanni, 8, 43100 PARMA",43100.0,,,unknown
+93,euronics_dimo_roncadelle,32,euronics_dimo,Euronics Roncadelle,"Via Luigi Einaudi, 25030 RONCADELLE (BS)",25030.0,Lombardia,Brescia,north
+94,euronics_dimo_concesio,33,euronics_dimo,Euronics Concesio,"Via delle Camerate, 25062 CONCESIO (BS)",25062.0,Lombardia,Brescia,north
+95,euronics_dimo_nichelino,34,euronics_dimo,Euronics Nichelino,"Via dei Cacciatori, 111, 10042 NICHELINO (TO)",10042.0,Piemonte,Torino,north
+96,euronics_dimo_olbia,35,euronics_dimo,Euronics Olbia,"Via Degli Astronauti, 7026 OLBIA",7026.0,Sardegna,Sassari,islands
+97,euronics_dimo_crema,36,euronics_dimo,Euronics Crema,"Centro Comm.le Gran Rondò, 26013 CREMA (CR)",26013.0,Lombardia,Cremona,north
+98,euronics_dimo_settimo_torinese,37,euronics_dimo,Euronics Settimo Torinese,"Settimo Cielo Retail Park, 10036 SETTIMO TORI",10036.0,Piemonte,Torino,north
+99,euronics_dimo_lavagna,38,euronics_dimo,Euronics Cogorno,"Via Umberto Vittorio Podestà, 1, 16030 COGORN",16030.0,Liguria,Genova,north
+100,euronics_dimo_como,39,euronics_dimo,Euronics Como,"Via Cecilio, 4, 22100 COMO",22100.0,Lombardia,Como,north
+101,euronics_dimo_osnago,40,euronics_dimo,Euronics Osnago,"Via Statale, 20, 23875 OSNAGO",23875.0,Lombardia,Lecco,north
+102,euronics_dimo_tradate,41,euronics_dimo,Euronics Tradate,"Via della Fornace Cortellezzi, 21049 TRADATE",21049.0,Lombardia,Varese,north
+103,euronics_dimo_torino_quattro,42,euronics_dimo,Euronics Torino 4,"Corso Romania, 460, 10156 TORINO",10156.0,Piemonte,Torino,north
+104,euronics_dimo_sassari,43,euronics_dimo,Euronics Sassari,"Viale Porto Torres, 7100 Sassari(SS)",7100.0,Sardegna,Sassari,islands
+105,euronics_dimo_venaria,44,euronics_dimo,Euronics Venaria Reale,"Corso Giuseppe Garibaldi, 235, 10078 Venaria ",10078.0,Piemonte,Torino,north
+106,euronics_dimo_genova_due,45,euronics_dimo,Euronics Genova 2,"Piazza Cavour, 20, 16128 Genova (GE)",16128.0,Liguria,Genova,north
+107,euronics_dimo_cagliari,46,euronics_dimo,Euronics Cagliari,"Via S. Giorgio, 9030 Elmas (CA)",9030.0,Sardegna,Sud Sardegna,islands
+108,euronics_dimo_vigevano,47,euronics_dimo,Euronics Vigevano,"Viale Industria, 27029 Vigevano (PV)",27029.0,Lombardia,Pavia,north
+109,euronics_dimo_gozzano,48,euronics_dimo,Euornics Gozzano,"Via Don Minzoni 5, 28024 Gozzano (NO)",28024.0,Piemonte,Novara,north
+110,euronics_dimo_gavardo,49,euronics_dimo,Euronics Gavardo,"Via Gianbattista Bruni Conter, 25085 Gavardo ",25085.0,Lombardia,Brescia,north
+111,irapido_b2b,irapido_b2b,irapido,iRapido Tiburtina,Via Tiburtina 1166 - 00156 Roma,156.0,Lazio,Roma,center
+112,euronics_butali_frosinone,478,euronics,Euronics Frosinone,"Via Armando Vona, 20, 03100 Frosinone FR",3100.0,Lazio,Frosinone,center
+113,euronics_butali_pomezia,477,euronics,Euronics Pomezia,"Via Naro, 2/4/2/4, 00071 Pomezia RM",71.0,Lazio,Roma,center
