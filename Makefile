@@ -376,6 +376,7 @@ pipeline:
 	$(MAKE) feast-apply
 	$(MAKE) feast-materialize
 	$(MAKE) create-training-data
+	$(MAKE) evaluate-rules
 	$(MAKE) feature-select
 	$(MAKE) train PROFILE=production
 	$(MAKE) train PROFILE=shadow

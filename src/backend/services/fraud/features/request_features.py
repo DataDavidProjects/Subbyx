@@ -34,102 +34,96 @@ REQUEST_FEATURE_SCHEMA: dict[str, dict[str, Any]] = {
 }
 
 
+def _schema_default(feature_name: str) -> Any:
+    return REQUEST_FEATURE_SCHEMA[feature_name]["default"]
+
+
+def _normalize_str(value: Any) -> str:
+    return str(value).strip().lower() if value else ""
+
+
+def _extract_base_features(ctx: CheckoutContext) -> dict[str, Any]:
+    features: dict[str, Any] = {}
+    for feature_name, spec in REQUEST_FEATURE_SCHEMA.items():
+        field_name = spec["field"]
+        if field_name is None or not hasattr(ctx, field_name):
+            continue
+
+        value = getattr(ctx, field_name, None)
+        if value is None or value == "":
+            value = spec["default"]
+        features[feature_name] = value
+    return features
+
+
+def _derive_is_night_time(timestamp: str | None) -> bool:
+    try:
+        dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        return dt.hour >= 22 or dt.hour < 6
+    except (ValueError, TypeError):
+        return _schema_default("is_night_time")
+
+
+def _derive_email_domain(email: str | None) -> str:
+    if email and "@" in email:
+        return email.split("@")[-1].lower()
+    return _schema_default("email_domain")
+
+
+def _derive_category_risk_features(category: str | None) -> dict[str, Any]:
+    cat_lower = _normalize_str(category)
+    is_storage_variant = any(keyword in cat_lower for keyword in ("gb", "tb", "cpu"))
+    is_smartphone_or_watch = any(
+        keyword in cat_lower for keyword in ("smartphone", "smartwatch")
+    )
+    is_high_risk_category = is_storage_variant or is_smartphone_or_watch
+
+    if is_storage_variant:
+        category_risk_tier = "high"
+    elif is_smartphone_or_watch:
+        category_risk_tier = "medium"
+    else:
+        category_risk_tier = "low"
+
+    return {
+        "is_storage_variant": is_storage_variant,
+        "is_smartphone_or_watch": is_smartphone_or_watch,
+        "is_high_risk_category": is_high_risk_category,
+        "category_risk_tier": category_risk_tier,
+    }
+
+
+def _derive_card_risk_features(card_funding: str | None, card_cvc_check: str | None) -> dict[str, bool]:
+    funding = _normalize_str(card_funding)
+    cvc = _normalize_str(card_cvc_check)
+
+    is_debit_card = funding == "debit"
+    is_prepaid_card = funding == "prepaid"
+    card_cvc_fail = cvc == "fail"
+    card_cvc_unavailable = cvc == "unavailable"
+
+    return {
+        "is_debit_card": is_debit_card,
+        "is_prepaid_card": is_prepaid_card,
+        "card_cvc_fail": card_cvc_fail,
+        "card_cvc_unavailable": card_cvc_unavailable,
+        "is_high_risk_card": is_debit_card or card_cvc_fail or card_cvc_unavailable,
+    }
+
+
 def extract_request_features(ctx: CheckoutContext) -> dict[str, Any]:
     """Extract model-ready request features from a CheckoutContext.
 
     Returns a dict with consistent keys regardless of None fields in context.
     """
-    features: dict[str, Any] = {}
+    features = _extract_base_features(ctx)
 
-    # 1. Base features from context fields (skip derived features with field=None)
-    for feature_name, spec in REQUEST_FEATURE_SCHEMA.items():
-        if spec["field"] is None:
-            continue  # Derived features handled separately below
-        if hasattr(ctx, spec["field"]):
-            value = getattr(ctx, spec["field"], None)
-            if value is None or value == "":
-                value = spec["default"]
-            features[feature_name] = value
-
-    # 2. Derived: is_night_time (22:00 - 06:00)
-    try:
-        # Example timestamp: 2024-08-11 07:29:43
-        dt = datetime.strptime(ctx.timestamp, "%Y-%m-%d %H:%M:%S")
-        features["is_night_time"] = dt.hour >= 22 or dt.hour < 6
-    except (ValueError, TypeError):
-        features["is_night_time"] = REQUEST_FEATURE_SCHEMA["is_night_time"]["default"]
-
-    # 3. Derived: is_high_value (> 100)
+    # Derived from checkout context and normalized in one place.
+    features["is_night_time"] = _derive_is_night_time(ctx.timestamp)
     features["is_high_value"] = ctx.subscription_value > 100.0
+    features["email_domain"] = _derive_email_domain(ctx.email)
 
-    # 4. Derived: email_domain
-    if ctx.email and "@" in ctx.email:
-        features["email_domain"] = ctx.email.split("@")[-1].lower()
-    else:
-        features["email_domain"] = REQUEST_FEATURE_SCHEMA["email_domain"]["default"]
-
-    # 5. Derived: category risk features (initialize with defaults)
-    features["is_storage_variant"] = REQUEST_FEATURE_SCHEMA["is_storage_variant"]["default"]
-    features["is_smartphone_or_watch"] = REQUEST_FEATURE_SCHEMA["is_smartphone_or_watch"]["default"]
-    features["is_high_risk_category"] = REQUEST_FEATURE_SCHEMA["is_high_risk_category"]["default"]
-    features["category_risk_tier"] = REQUEST_FEATURE_SCHEMA["category_risk_tier"]["default"]
-
-    category = str(ctx.category).strip() if ctx.category else ""
-    cat_lower = category.lower()
-
-    # Check for storage variants (e.g., "256Gb", "128Gb", "512Gb")
-    features["is_storage_variant"] = any(x in cat_lower for x in ["gb", "tb", "cpu"])
-
-    # Check for smartphone or smartwatch categories
-    features["is_smartphone_or_watch"] = any(x in cat_lower for x in ["smartphone", "smartwatch"])
-
-    # High-risk categories based on historical fraud analysis (>10% fraud rate)
-    # Includes: storage variants (14.1%), smartwatches (12.6%), smartphones (11.4%)
-    high_risk_keywords = ["smartphone", "smartwatch"]
-    features["is_high_risk_category"] = (
-        features["is_storage_variant"] or
-        any(x in cat_lower for x in high_risk_keywords)
-    )
-
-    # Category risk tier: low, medium, high
-    if features["is_storage_variant"]:
-        features["category_risk_tier"] = "high"
-    elif features["is_smartphone_or_watch"]:
-        features["category_risk_tier"] = "medium"
-    else:
-        features["category_risk_tier"] = "low"
-
-    # 6. Derived: card risk features for cold start (initialize with defaults)
-    features["is_debit_card"] = REQUEST_FEATURE_SCHEMA["is_debit_card"]["default"]
-    features["is_prepaid_card"] = REQUEST_FEATURE_SCHEMA["is_prepaid_card"]["default"]
-    features["is_high_risk_card"] = REQUEST_FEATURE_SCHEMA["is_high_risk_card"]["default"]
-    features["card_cvc_fail"] = REQUEST_FEATURE_SCHEMA["card_cvc_fail"]["default"]
-    features["card_cvc_unavailable"] = REQUEST_FEATURE_SCHEMA["card_cvc_unavailable"]["default"]
-
-    card_funding = str(ctx.card_funding).lower().strip() if ctx.card_funding else ""
-    card_cvc = str(ctx.card_cvc_check).lower().strip() if ctx.card_cvc_check else ""
-
-    # Card funding type risk (based on historical analysis)
-    # Debit cards: 9.0% fraud rate (highest)
-    # Prepaid cards: 4.5% fraud rate
-    # Credit cards: 2.7% fraud rate (lowest)
-    features["is_debit_card"] = card_funding == "debit"
-    features["is_prepaid_card"] = card_funding == "prepaid"
-
-    # CVC check risk indicators
-    # fail: highest risk (but rare)
-    # unavailable: slightly elevated risk
-    features["card_cvc_fail"] = card_cvc == "fail"
-    features["card_cvc_unavailable"] = card_cvc == "unavailable"
-
-    # Composite high-risk card indicator
-    # Debit cards are highest risk (9% vs 2.7% for credit)
-    # CVC check failures are also high risk
-    # CVC unavailable is elevated risk regardless of card type
-    features["is_high_risk_card"] = (
-        features["is_debit_card"] or
-        features["card_cvc_fail"] or
-        features["card_cvc_unavailable"]
-    )
+    features.update(_derive_category_risk_features(ctx.category))
+    features.update(_derive_card_risk_features(ctx.card_funding, ctx.card_cvc_check))
 
     return features

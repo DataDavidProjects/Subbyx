@@ -10,6 +10,12 @@ class TestSegmentDetermination:
     """Tests for customer_id based segment determination."""
 
     @pytest.fixture
+    def determine_segment(self):
+        from routes.fraud.checkout import determine_segment as _determine_segment
+
+        return _determine_segment
+
+    @pytest.fixture
     def sample_checkouts_df(self) -> pd.DataFrame:
         return pd.DataFrame(
             {
@@ -21,163 +27,146 @@ class TestSegmentDetermination:
             }
         )
 
-    def test_new_customer_no_prior_checkouts(self, sample_checkouts_df: pd.DataFrame) -> None:
-        """Customer with no completed checkouts should be NEW."""
-        from routes.fraud.checkout import determine_segment
+    @staticmethod
+    def _run_segment(
+        determine_segment,
+        checkouts_df: pd.DataFrame,
+        customer_id: str,
+        timestamp: str,
+    ) -> tuple[str, str]:
+        with patch("routes.fraud.checkout.load_checkouts", return_value=checkouts_df):
+            return determine_segment(customer_id=customer_id, timestamp=timestamp)
 
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            mock_load.return_value = pd.DataFrame(
-                {
-                    "customer": [],
-                    "status": [],
-                    "mode": [],
-                    "created": [],
-                }
-            )
-            segment, reason = determine_segment(
-                customer_id="new_cust", timestamp="2024-12-01T00:00:00"
-            )
-            assert segment == "NEW_CUSTOMER"
-            assert "No prior completed checkouts" in reason
+    def test_new_customer_no_prior_checkouts(self, determine_segment) -> None:
+        """Customer with no completed checkouts should be NEW_CUSTOMER."""
+        empty_checkouts = pd.DataFrame({"customer": [], "status": [], "mode": [], "created": []})
+        segment, reason = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=empty_checkouts,
+            customer_id="new_cust",
+            timestamp="2024-12-01T00:00:00",
+        )
+
+        assert segment == "NEW_CUSTOMER"
+        assert "No prior completed checkouts" in reason
 
     def test_returning_customer_with_completed_checkout(
-        self, sample_checkouts_df: pd.DataFrame
+        self, determine_segment, sample_checkouts_df: pd.DataFrame
     ) -> None:
         """Customer with completed checkout should be RETURNING."""
-        from routes.fraud.checkout import determine_segment
-
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            mock_load.return_value = sample_checkouts_df
-            segment, reason = determine_segment(
-                customer_id="cust_1", timestamp="2024-12-01T00:00:00"
-            )
-            assert segment == "RETURNING"
-            assert "Prior completed checkout found" in reason
+        segment, reason = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=sample_checkouts_df,
+            customer_id="cust_1",
+            timestamp="2024-12-01T00:00:00",
+        )
+        assert segment == "RETURNING"
+        assert "Prior completed checkout found" in reason
 
     def test_pit_filtering_old_checkout_not_counted(
-        self, sample_checkouts_df: pd.DataFrame
+        self, determine_segment
     ) -> None:
         """Checkout after cutoff should not count (PIT correctness)."""
-        from routes.fraud.checkout import determine_segment
+        checkouts_df = pd.DataFrame(
+            {"customer": ["cust_1"], "status": ["complete"], "mode": ["payment"], "created": ["2025-06-01"]}
+        )
+        segment, _ = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=checkouts_df,
+            customer_id="cust_1",
+            timestamp="2025-01-01T00:00:00",
+        )
+        assert segment == "NEW_CUSTOMER"
 
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            # Checkout in June 2025, but cutoff is Jan 2025 - should not count
-            mock_load.return_value = pd.DataFrame(
-                {
-                    "customer": ["cust_1"],
-                    "status": ["complete"],
-                    "mode": ["payment"],
-                    "created": ["2025-06-01"],
-                }
-            )
-            segment, reason = determine_segment(
-                customer_id="cust_1", timestamp="2025-01-01T00:00:00"
-            )
-            assert segment == "NEW_CUSTOMER"
-
-    def test_pit_filtering_old_checkout_counts(self, sample_checkouts_df: pd.DataFrame) -> None:
+    def test_pit_filtering_old_checkout_counts(self, determine_segment) -> None:
         """Checkout before cutoff should count (PIT correctness)."""
-        from routes.fraud.checkout import determine_segment
+        checkouts_df = pd.DataFrame(
+            {"customer": ["cust_1"], "status": ["complete"], "mode": ["payment"], "created": ["2024-06-01"]}
+        )
+        segment, _ = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=checkouts_df,
+            customer_id="cust_1",
+            timestamp="2024-12-01T00:00:00",
+        )
+        assert segment == "RETURNING"
 
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            # Checkout in June 2024, cutoff is Dec 2024 - should count
-            mock_load.return_value = pd.DataFrame(
-                {
-                    "customer": ["cust_1"],
-                    "status": ["complete"],
-                    "mode": ["payment"],
-                    "created": ["2024-06-01"],
-                }
-            )
-            segment, reason = determine_segment(
-                customer_id="cust_1", timestamp="2024-12-01T00:00:00"
-            )
-            assert segment == "RETURNING"
-
-    def test_expired_checkout_does_not_count(self, sample_checkouts_df: pd.DataFrame) -> None:
+    def test_expired_checkout_does_not_count(self, determine_segment, sample_checkouts_df: pd.DataFrame) -> None:
         """Expired checkout should not make customer RETURNING."""
-        from routes.fraud.checkout import determine_segment
+        segment, _ = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=sample_checkouts_df,
+            customer_id="cust_2",
+            timestamp="2024-12-01T00:00:00",
+        )
+        assert segment == "NEW_CUSTOMER"
 
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            mock_load.return_value = sample_checkouts_df
-            segment, reason = determine_segment(
-                customer_id="cust_2", timestamp="2024-12-01T00:00:00"
-            )
-            assert segment == "NEW_CUSTOMER"
-
-    def test_setup_mode_does_not_count(self, sample_checkouts_df: pd.DataFrame) -> None:
+    def test_setup_mode_does_not_count(self, determine_segment, sample_checkouts_df: pd.DataFrame) -> None:
         """mode=setup should not make customer RETURNING."""
-        from routes.fraud.checkout import determine_segment
+        segment, _ = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=sample_checkouts_df,
+            customer_id="cust_3",
+            timestamp="2024-06-15T00:00:00",
+        )
+        assert segment == "NEW_CUSTOMER"
 
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            mock_load.return_value = sample_checkouts_df
-            # cust_3 has only 'setup' and one 'payment', both in July
-            # But with early cutoff, should be NEW
-            segment, reason = determine_segment(
-                customer_id="cust_3", timestamp="2024-06-15T00:00:00"
-            )
-            assert segment == "NEW_CUSTOMER"
-
-    def test_no_customer_id_returns_new(self) -> None:
+    def test_no_customer_id_returns_new(self, determine_segment) -> None:
         """Missing customer_id should return NEW_CUSTOMER."""
-        from routes.fraud.checkout import determine_segment
+        checkouts_df = pd.DataFrame(
+            {
+                "customer": ["some_cust"],
+                "status": ["complete"],
+                "mode": ["payment"],
+                "created": ["2024-01-01"],
+            }
+        )
+        segment, reason = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=checkouts_df,
+            customer_id="",
+            timestamp="2024-12-01T00:00:00",
+        )
+        assert segment == "NEW_CUSTOMER"
+        assert "No customer_id provided" in reason
 
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            mock_load.return_value = pd.DataFrame(
-                {
-                    "customer": ["some_cust"],
-                    "status": ["complete"],
-                    "mode": ["payment"],
-                    "created": ["2024-01-01"],
-                }
-            )
-            segment, reason = determine_segment(customer_id="", timestamp="2024-12-01T00:00:00")
-            assert segment == "NEW_CUSTOMER"
-            assert "No customer_id provided" in reason
-
-    def test_payment_mode_counts(self, sample_checkouts_df: pd.DataFrame) -> None:
+    def test_payment_mode_counts(self, determine_segment) -> None:
         """mode=payment should count toward RETURNING."""
-        from routes.fraud.checkout import determine_segment
+        checkouts_df = pd.DataFrame(
+            {"customer": ["cust_1"], "status": ["complete"], "mode": ["payment"], "created": ["2024-01-01"]}
+        )
+        segment, _ = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=checkouts_df,
+            customer_id="cust_1",
+            timestamp="2024-12-01T00:00:00",
+        )
+        assert segment == "RETURNING"
 
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            mock_load.return_value = pd.DataFrame(
-                {
-                    "customer": ["cust_1"],
-                    "status": ["complete"],
-                    "mode": ["payment"],
-                    "created": ["2024-01-01"],
-                }
-            )
-            segment, reason = determine_segment(
-                customer_id="cust_1", timestamp="2024-12-01T00:00:00"
-            )
-            assert segment == "RETURNING"
-
-    def test_subscription_mode_counts(self, sample_checkouts_df: pd.DataFrame) -> None:
+    def test_subscription_mode_counts(self, determine_segment) -> None:
         """mode=subscription should count toward RETURNING."""
-        from routes.fraud.checkout import determine_segment
+        checkouts_df = pd.DataFrame(
+            {
+                "customer": ["cust_1"],
+                "status": ["complete"],
+                "mode": ["subscription"],
+                "created": ["2024-01-01"],
+            }
+        )
+        segment, _ = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=checkouts_df,
+            customer_id="cust_1",
+            timestamp="2024-12-01T00:00:00",
+        )
+        assert segment == "RETURNING"
 
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            mock_load.return_value = pd.DataFrame(
-                {
-                    "customer": ["cust_1"],
-                    "status": ["complete"],
-                    "mode": ["subscription"],
-                    "created": ["2024-01-01"],
-                }
-            )
-            segment, reason = determine_segment(
-                customer_id="cust_1", timestamp="2024-12-01T00:00:00"
-            )
-            assert segment == "RETURNING"
-
-    def test_multiple_completed_checkouts(self, sample_checkouts_df: pd.DataFrame) -> None:
+    def test_multiple_completed_checkouts(self, determine_segment, sample_checkouts_df: pd.DataFrame) -> None:
         """Multiple completed checkouts should still be RETURNING."""
-        from routes.fraud.checkout import determine_segment
-
-        with patch("routes.fraud.checkout.load_checkouts") as mock_load:
-            mock_load.return_value = sample_checkouts_df
-            segment, reason = determine_segment(
-                customer_id="cust_1", timestamp="2024-12-01T00:00:00"
-            )
-            assert segment == "RETURNING"
+        segment, _ = self._run_segment(
+            determine_segment=determine_segment,
+            checkouts_df=sample_checkouts_df,
+            customer_id="cust_1",
+            timestamp="2024-12-01T00:00:00",
+        )
+        assert segment == "RETURNING"

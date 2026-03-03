@@ -5,18 +5,40 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 
-import pandas as pd
 from fastapi import APIRouter
+import pandas as pd
 
 from routes.config import shared_config
 from routes.fraud.config import config as fraud_config
+from routes.fraud.rules.fiscal_code import (
+    is_duplicate_fiscal_code,
+    load_fiscal_code_to_emails,
+)
+from routes.fraud.rules.payment_failure import check_payment_failure
+from routes.fraud.rules.stripe_risk import load_charges_with_highest_risk
 from routes.fraud.schemas import CheckoutRequest, CheckoutResponse
+from services.fraud.context import resolve_checkout
+from services.fraud.features import get_features as get_feast_features
+from services.fraud.features.metadata import get_feature_metadata
+from services.fraud.features.request_features import extract_request_features
+from services.fraud.features.selection.transformers import AddMissingIndicators
+from services.fraud.inference.model import production_model, score_models
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["fraud-checkout"])
 
 DATA_DIR = Path("/Users/davidelupis/Desktop/Subbyx/data")
+
+REQUEST_TO_MODEL_FEATURE_MAP = {
+    "subscription_value": "checkout_features__subscription_value",
+    "grade": "checkout_features__grade",
+    "category": "checkout_features__category",
+}
+
+FEAST_NULL_FALLBACKS = {
+    "payment_intent_features__subscription_value": "subscription_value",
+}
 
 
 @lru_cache(maxsize=1)
@@ -67,13 +89,7 @@ def has_completed_checkout(customer_id: str, cutoff_time: str | None = None) -> 
     return customer_id in completed["customer"].values
 
 
-def determine_segment(
-    customer_id: str,
-    email: str | None = None,
-    fiscal_code: str | None = None,
-    card_fingerprint: str | None = None,
-    timestamp: str | None = None,
-) -> tuple[str, str]:
+def determine_segment(customer_id: str, timestamp: str | None = None) -> tuple[str, str]:
     """Determine segment via customer_id check for completed checkouts.
 
     If customer has prior completed checkout (status='complete', mode IN payment/subscription)
@@ -102,13 +118,14 @@ def determine_segment(
 def get_decision(score: float, segment: str) -> tuple[str, str]:
     segments = fraud_config.get("segments", {})
 
-    if segment in segments:
-        threshold = segments[segment].get("threshold")
-    else:
-        if segment == fraud_config["segment_keys"]["returning"]:
-            threshold = fraud_config["segments"]["RETURNING"]["default_threshold"]
-        else:
-            threshold = fraud_config["segments"]["NEW_CUSTOMER"]["default_threshold"]
+    threshold = segments.get(segment, {}).get("threshold")
+    if threshold is None:
+        default_segment = (
+            "RETURNING"
+            if segment == fraud_config["segment_keys"]["returning"]
+            else "NEW_CUSTOMER"
+        )
+        threshold = fraud_config["segments"][default_segment]["default_threshold"]
 
     block_decision = shared_config["decisions"]["block"]
     approve_decision = shared_config["decisions"]["approve"]
@@ -131,14 +148,42 @@ def get_decision(score: float, segment: str) -> tuple[str, str]:
     return approve_decision, f"Score {score:.2f} within threshold {threshold}"
 
 
+def build_block_response(
+    reason: str,
+    rule_triggered: str,
+    segment: str,
+    segment_reason: str,
+) -> CheckoutResponse:
+    return CheckoutResponse(
+        decision=shared_config["decisions"]["block"],
+        reason=reason,
+        rule_triggered=rule_triggered,
+        score=None,
+        segment=segment,
+        segment_reason=segment_reason,
+    )
+
+
+def merge_features(feast_features: dict, request_features: dict) -> dict:
+    all_features = {**feast_features}
+
+    for req_key, feat_key in REQUEST_TO_MODEL_FEATURE_MAP.items():
+        if req_key in request_features:
+            all_features[feat_key] = request_features[req_key]
+
+    for feast_key, req_key in FEAST_NULL_FALLBACKS.items():
+        if all_features.get(feast_key) is None and req_key in request_features:
+            all_features[feast_key] = request_features[req_key]
+
+    all_features.update(request_features)
+    AddMissingIndicators.enrich_dict(all_features)
+    return all_features
+
+
 @router.post("/v1/checkout", response_model=CheckoutResponse)
 def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
     logger.info("[BACKEND] ========================================")
     logger.info("[BACKEND] checkout request: checkout_id=%s", request.checkout_id)
-
-    # 0. Resolve context from checkout_id
-    from services.fraud.context import resolve_checkout
-    from services.fraud.features.request_features import extract_request_features
 
     ctx = resolve_checkout(request.checkout_id)
     logger.info(
@@ -148,22 +193,14 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
         ctx.store_id,
     )
 
-    # 1. Segment determination
     logger.info("[BACKEND] Step 1: Determining segment for customer_id=%s", ctx.customer_id)
-    segment, segment_reason = determine_segment(
-        ctx.customer_id,
-        ctx.email,
-        ctx.fiscal_code,
-        ctx.card_fingerprint,
-        ctx.timestamp,
-    )
+    segment, segment_reason = determine_segment(ctx.customer_id, ctx.timestamp)
     logger.info(
         "[BACKEND] Step 1 complete: segment=%s, reason=%s",
         segment,
         segment_reason,
     )
 
-    # 2. Rules engine (pre-model checks)
     logger.info("[BACKEND] Step 2: Checking rules engine")
     blacklist = load_blacklist()
     if ctx.email in blacklist:
@@ -172,17 +209,12 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
             ctx.email,
             segment,
         )
-        return CheckoutResponse(
-            decision="BLOCK",
+        return build_block_response(
             reason="Email %s in blacklist" % ctx.email,
             rule_triggered="blacklist",
-            score=None,
             segment=segment,
             segment_reason=segment_reason,
         )
-
-    # 2a. Stripe risk check
-    from routes.fraud.rules.stripe_risk import load_charges_with_highest_risk
 
     high_risk_emails = load_charges_with_highest_risk(ctx.timestamp)
     if ctx.email in high_risk_emails:
@@ -191,22 +223,14 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
             ctx.email,
             segment,
         )
-        return CheckoutResponse(
-            decision="BLOCK",
+        return build_block_response(
             reason="Email has highest risk level from Stripe",
             rule_triggered="stripe_risk",
-            score=None,
             segment=segment,
             segment_reason=segment_reason,
         )
 
     logger.info("[BACKEND] Step 2: No rules triggered")
-
-    # 2b. Fiscal code duplicate check
-    from routes.fraud.rules.fiscal_code import (
-        is_duplicate_fiscal_code,
-        load_fiscal_code_to_emails,
-    )
 
     if ctx.fiscal_code:
         fiscal_code_mapping = load_fiscal_code_to_emails(ctx.timestamp)
@@ -221,25 +245,20 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
                 ctx.fiscal_code,
                 segment,
             )
-            return CheckoutResponse(
-                decision="BLOCK",
+            return build_block_response(
                 reason="Fiscal code %s used with different emails: %s"
                 % (ctx.fiscal_code, ", ".join(sorted(emails))),
                 rule_triggered="fiscal_code_duplicate",
-                score=None,
                 segment=segment,
                 segment_reason=segment_reason,
             )
 
-    # 3. Fetch batch features with all entity keys
     logger.info(
         "[BACKEND] Step 3: Fetching features for email=%s, customer_id=%s, store_id=%s",
         ctx.email,
         ctx.customer_id,
         ctx.store_id,
     )
-
-    from services.fraud.features import get_features as get_feast_features
 
     feast_features = get_feast_features(
         email=ctx.email,
@@ -250,75 +269,30 @@ def fraud_checkout(request: CheckoutRequest) -> CheckoutResponse:
         timestamp=ctx.timestamp,
     )
 
-    # 3a. Payment failure rate check (pre-model rule)
-    # Uses the features fetched in Step 3, but runs BEFORE model scoring.
-    # Now applies to ALL segments to catch high-risk 'new' customers with attempt history.
-    from routes.fraud.rules.payment_failure import check_payment_failure
-
     pf_triggered, pf_reason = check_payment_failure(feast_features, segment)
     if pf_triggered:
         logger.info(
             "[BACKEND] Step 3a: PAYMENT_FAILURE rule triggered (segment=%s)",
             segment,
         )
-        return CheckoutResponse(
-            decision="BLOCK",
+        return build_block_response(
             reason=pf_reason,
             rule_triggered="payment_failure",
-            score=None,
             segment=segment,
             segment_reason=segment_reason,
         )
 
-    # 4. Merge request features and align with model prefixes
     request_features = extract_request_features(ctx)
-    all_features = {**feast_features}
-
-    # Map request features to their prefixed counterparts if needed by model
-    # Note: checkout_features removed from Feast - these are pure request-time values
-    # Card features are now only request-time (via CheckoutContext), not from Feast
-    mapping = {
-        "subscription_value": "checkout_features__subscription_value",
-        "grade": "checkout_features__grade",
-        "category": "checkout_features__category",
-    }
-    for req_key, feat_key in mapping.items():
-        if req_key in request_features:
-            all_features[feat_key] = request_features[req_key]
-
-    # Fill null Feast features with request-time values when available.
-    # payment_intent_features__subscription_value is often null in the
-    # online store (PI not yet created), but we know the value from the
-    # checkout request — use it to avoid imputing -1.
-    _feast_fallbacks = {
-        "payment_intent_features__subscription_value": "subscription_value",
-    }
-    for feast_key, req_key in _feast_fallbacks.items():
-        if all_features.get(feast_key) is None and req_key in request_features:
-            all_features[feast_key] = request_features[req_key]
-
-    # Keep original request features for fallback/selection
-    all_features.update(request_features)
-
-    # Add missing-indicator flags (train/serve parity)
-    from services.fraud.features.selection.transformers import AddMissingIndicators
-
-    AddMissingIndicators.enrich_dict(all_features)
-
-    from services.fraud.inference.model import score_models
+    all_features = merge_features(feast_features, request_features)
 
     result = score_models(all_features)
 
     # Build response features from MLflow columns
-    from services.fraud.inference.model import production_model
-
     mlflow_feature_cols = production_model.feature_columns
     response_features: dict = {col: all_features.get(col) for col in mlflow_feature_cols}
 
     # Attach feature metadata (label + description) from Feast tags
     try:
-        from services.fraud.features.metadata import get_feature_metadata
-
         response_features["__meta"] = get_feature_metadata()
     except Exception as meta_exc:
         logger.warning("Failed to attach feature metadata: %s", meta_exc)

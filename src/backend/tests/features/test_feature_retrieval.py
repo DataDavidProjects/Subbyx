@@ -8,6 +8,28 @@ import pytest
 
 
 DATA_DIR = Path(__file__).parents[4] / "data"
+FEATURE_SOURCES_DIR = (
+    DATA_DIR.parent / "src" / "backend" / "feature_repo" / "data" / "sources"
+)
+
+
+def _get_store():
+    from services.fraud.features.store import store
+
+    if store is None:
+        pytest.skip("Feast store not available")
+    return store
+
+
+def _single_entity_df(email: str, event_timestamp: object) -> pd.DataFrame:
+    return pd.DataFrame({"email": [email], "event_timestamp": [event_timestamp]})
+
+
+def _assert_equal_or_both_nan(actual: object, expected: object) -> None:
+    if pd.isna(actual):
+        assert pd.isna(expected), f"Expected {expected}, got {actual}"
+        return
+    assert actual == expected, f"Expected {expected}, got {actual}"
 
 
 class TestHistoricalFeatureRetrieval:
@@ -15,20 +37,15 @@ class TestHistoricalFeatureRetrieval:
 
     def test_charge_stats_aggregation_correct(self) -> None:
         """Verify charge stats are correctly aggregated from Feast."""
-        from services.fraud.features.store import store
-
-        if store is None:
-            pytest.skip("Feast store not available")
+        store = _get_store()
 
         charges = pd.read_csv(DATA_DIR / "01-clean" / "charges.csv")
         email_with_history = charges["email"].value_counts().head(1).index[0]
         expected_count = len(charges[charges["email"] == email_with_history])
 
-        entity_df = pd.DataFrame(
-            {
-                "email": [email_with_history],
-                "event_timestamp": [pd.Timestamp("2025-01-01", tz=timezone.utc)],
-            }
+        entity_df = _single_entity_df(
+            email=email_with_history,
+            event_timestamp=pd.Timestamp("2025-01-01", tz=timezone.utc),
         )
 
         features = store.get_historical_features(
@@ -45,27 +62,14 @@ class TestHistoricalFeatureRetrieval:
 
     def test_checkout_features_match_source_data(self) -> None:
         """Verify checkout features match the source parquet data."""
-        from services.fraud.features.store import store
+        store = _get_store()
 
-        if store is None:
-            pytest.skip("Feast store not available")
-
-        checkouts = pd.read_parquet(
-            DATA_DIR.parent
-            / "src"
-            / "backend"
-            / "feature_repo"
-            / "data"
-            / "sources"
-            / "checkouts.parquet"
-        )
+        checkouts = pd.read_parquet(FEATURE_SOURCES_DIR / "checkouts.parquet")
         sample_row = checkouts.iloc[0]
 
-        entity_df = pd.DataFrame(
-            {
-                "email": [sample_row["email"]],
-                "event_timestamp": [sample_row["created"]],
-            }
+        entity_df = _single_entity_df(
+            email=sample_row["email"],
+            event_timestamp=sample_row["created"],
         )
 
         features = store.get_historical_features(
@@ -77,18 +81,11 @@ class TestHistoricalFeatureRetrieval:
 
         actual_value = result_df["checkout_features__subscription_value"].iloc[0]
         expected_value = sample_row["subscription_value"]
-        # Handle NaN comparison - both should be NaN or both should have same value
-        if pd.isna(actual_value):
-            assert pd.isna(expected_value), f"Expected {expected_value}, got {actual_value}"
-        else:
-            assert actual_value == expected_value, f"Expected {expected_value}, got {actual_value}"
+        _assert_equal_or_both_nan(actual_value, expected_value)
 
     def test_temporal_lookup_only_returns_prior_history(self) -> None:
         """Verify Feast only returns data PRIOR to event_timestamp, not future."""
-        from services.fraud.features.store import store
-
-        if store is None:
-            pytest.skip("Feast store not available")
+        store = _get_store()
 
         charges = pd.read_csv(DATA_DIR / "01-clean" / "charges.csv")
         email = charges["email"].value_counts().head(1).index[0]
@@ -96,18 +93,14 @@ class TestHistoricalFeatureRetrieval:
         earliest_charge = pd.to_datetime(charge_times.min())
         later_charge = pd.to_datetime(charge_times.max())
 
-        entity_df_early = pd.DataFrame(
-            {
-                "email": [email],
-                "event_timestamp": [earliest_charge.to_pydatetime()],
-            }
+        entity_df_early = _single_entity_df(
+            email=email,
+            event_timestamp=earliest_charge.to_pydatetime(),
         )
 
-        entity_df_later = pd.DataFrame(
-            {
-                "email": [email],
-                "event_timestamp": [later_charge.to_pydatetime()],
-            }
+        entity_df_later = _single_entity_df(
+            email=email,
+            event_timestamp=later_charge.to_pydatetime(),
         )
 
         features_early = store.get_historical_features(
@@ -136,19 +129,16 @@ class TestOnlineFeatureRetrieval:
     def test_online_lookup_returns_same_as_historical(self) -> None:
         """Online lookup should return same as historical when querying after all data."""
         from services.fraud.features import get_features
+        store = _get_store()
 
         charges = pd.read_csv(DATA_DIR / "01-clean" / "charges.csv")
         email = charges["email"].value_counts().head(1).index[0]
 
         # Query historical at a date AFTER all charge data
-        entity_df = pd.DataFrame(
-            {
-                "email": [email],
-                "event_timestamp": [pd.Timestamp("2025-01-01", tz=timezone.utc)],
-            }
+        entity_df = _single_entity_df(
+            email=email,
+            event_timestamp=pd.Timestamp("2025-01-01", tz=timezone.utc),
         )
-
-        from services.fraud.features.store import store
 
         # Use failure_rate — it's in the production feature service
         historical = store.get_historical_features(
@@ -184,15 +174,7 @@ class TestFeatureDataIntegrity:
 
     def test_charge_source_has_no_duplicate_emails_per_timestamp(self) -> None:
         """Charge source should not have duplicate rows for same email-timestamp."""
-        charges = pd.read_parquet(
-            DATA_DIR.parent
-            / "src"
-            / "backend"
-            / "feature_repo"
-            / "data"
-            / "sources"
-            / "charges.parquet"
-        )
+        charges = pd.read_parquet(FEATURE_SOURCES_DIR / "charges.parquet")
 
         duplicates = charges.groupby(["email", "created"]).size()
         dup_count = (duplicates > 1).sum()
@@ -211,15 +193,7 @@ class TestFeatureDataIntegrity:
 
     def test_checkout_timestamps_are_chronological(self) -> None:
         """Checkouts should have valid chronological timestamps."""
-        checkouts = pd.read_parquet(
-            DATA_DIR.parent
-            / "src"
-            / "backend"
-            / "feature_repo"
-            / "data"
-            / "sources"
-            / "checkouts.parquet"
-        )
+        checkouts = pd.read_parquet(FEATURE_SOURCES_DIR / "checkouts.parquet")
 
         checkouts["created"] = pd.to_datetime(checkouts["created"])
         min_date = checkouts["created"].min()

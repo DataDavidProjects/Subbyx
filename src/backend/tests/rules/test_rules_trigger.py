@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
 from dataclasses import replace
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
-import pytest
 import pandas as pd
+import pytest
 
 # Add src/backend to path for imports
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -19,7 +21,7 @@ from services.fraud.inference.model import ScoringResult
 
 
 @pytest.fixture
-def mock_checkout_context():
+def mock_checkout_context() -> CheckoutContext:
     return CheckoutContext(
         checkout_id="test_checkout",
         customer_id="test_customer",
@@ -43,147 +45,168 @@ def mock_checkout_context():
 
 
 @pytest.fixture
-def mock_scoring_result():
+def mock_scoring_result() -> ScoringResult:
     return ScoringResult(
         score=0.1,
         scored_by="production",
         production_score=0.1,
         shadow_score=0.15,
-        features={"feat1": 1.0}
+        features={"feat1": 1.0},
     )
 
 
 @pytest.fixture
-def empty_checkouts_df():
-    return pd.DataFrame({
-        "customer": [],
-        "status": [],
-        "mode": [],
-        "created": []
-    })
+def empty_checkouts_df() -> pd.DataFrame:
+    return pd.DataFrame({"customer": [], "status": [], "mode": [], "created": []})
 
 
 class TestRulesTrigger:
     """Tests that fraud rules correctly trigger BLOCK decisions."""
 
-    @patch("services.fraud.context.resolve_checkout")
-    @patch("services.fraud.inference.model.score_models")
-    @patch("services.fraud.features.get_features")
-    @patch("routes.fraud.checkout.load_checkouts")
-    def test_blacklist_trigger(self, mock_load_checkouts, mock_get_features, mock_score_models, mock_resolve, mock_checkout_context, empty_checkouts_df):
-        """Rule: Blacklist should trigger BLOCK."""
+    @staticmethod
+    def _run_checkout(
+        *,
+        ctx: CheckoutContext,
+        checkouts_df: pd.DataFrame,
+        blacklist: set[str] | None = None,
+        high_risk_emails: set[str] | None = None,
+        fiscal_code_mapping: dict[str, set[str]] | None = None,
+        feast_features: dict | None = None,
+        score_result: ScoringResult | None = None,
+        request_features: dict | None = None,
+    ):
         from routes.fraud.checkout import fraud_checkout
-        
-        # Mock resolve_checkout to return a blacklisted email
-        ctx = replace(mock_checkout_context, email="fraud@example.com")
-        mock_resolve.return_value = ctx
-        
-        # Mock other dependencies
-        mock_load_checkouts.return_value = empty_checkouts_df
 
-        request = CheckoutRequest(checkout_id="test_checkout")
-        response = fraud_checkout(request)
+        with ExitStack() as stack:
+            stack.enter_context(patch("routes.fraud.checkout.resolve_checkout", return_value=ctx))
+            stack.enter_context(patch("routes.fraud.checkout.load_checkouts", return_value=checkouts_df))
+            stack.enter_context(patch("routes.fraud.checkout.load_blacklist", return_value=blacklist or set()))
+            stack.enter_context(
+                patch(
+                    "routes.fraud.checkout.load_charges_with_highest_risk",
+                    return_value=high_risk_emails or set(),
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "routes.fraud.checkout.load_fiscal_code_to_emails",
+                    return_value=fiscal_code_mapping or {},
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "routes.fraud.checkout.get_feast_features",
+                    return_value=feast_features or {},
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "routes.fraud.checkout.extract_request_features",
+                    return_value=request_features or {},
+                )
+            )
+            stack.enter_context(patch("routes.fraud.checkout.get_feature_metadata", return_value={}))
+            stack.enter_context(
+                patch(
+                    "routes.fraud.checkout.production_model",
+                    new=SimpleNamespace(feature_columns=["feat1"]),
+                )
+            )
+            mock_score_models = stack.enter_context(
+                patch("routes.fraud.checkout.score_models", return_value=score_result)
+            )
+            response = fraud_checkout(CheckoutRequest(checkout_id="test_checkout"))
+
+        return response, mock_score_models
+
+    def test_blacklist_trigger(
+        self,
+        mock_checkout_context: CheckoutContext,
+        empty_checkouts_df: pd.DataFrame,
+    ) -> None:
+        ctx = replace(mock_checkout_context, email="fraud@example.com")
+
+        response, mock_score_models = self._run_checkout(
+            ctx=ctx,
+            checkouts_df=empty_checkouts_df,
+            blacklist={"fraud@example.com"},
+        )
 
         assert response.decision == "BLOCK"
         assert response.rule_triggered == "blacklist"
         assert "blacklist" in response.reason.lower()
-        # Ensure model was NOT called
         mock_score_models.assert_not_called()
 
-    @patch("services.fraud.context.resolve_checkout")
-    @patch("services.fraud.inference.model.score_models")
-    @patch("services.fraud.features.get_features")
-    @patch("routes.fraud.checkout.load_checkouts")
-    def test_stripe_risk_trigger(self, mock_load_checkouts, mock_get_features, mock_score_models, mock_resolve, mock_checkout_context, empty_checkouts_df):
-        """Rule: Stripe Risk 'highest' should trigger BLOCK."""
-        from routes.fraud.checkout import fraud_checkout
-        
-        # Mock resolve_checkout to return an email with highest risk
-        ctx = replace(mock_checkout_context, email="9c7886b2-b527-4545-a119-12d103583a84@hotmail.com")
-        mock_resolve.return_value = ctx
-        
-        # Mock other dependencies
-        mock_load_checkouts.return_value = empty_checkouts_df
+    def test_stripe_risk_trigger(
+        self,
+        mock_checkout_context: CheckoutContext,
+        empty_checkouts_df: pd.DataFrame,
+    ) -> None:
+        risky_email = "9c7886b2-b527-4545-a119-12d103583a84@hotmail.com"
+        ctx = replace(mock_checkout_context, email=risky_email)
 
-        request = CheckoutRequest(checkout_id="test_checkout")
-        response = fraud_checkout(request)
+        response, mock_score_models = self._run_checkout(
+            ctx=ctx,
+            checkouts_df=empty_checkouts_df,
+            high_risk_emails={risky_email},
+        )
 
         assert response.decision == "BLOCK"
         assert response.rule_triggered == "stripe_risk"
-        assert "Stripe" in response.reason
-        # Ensure model was NOT called
+        assert "highest risk" in response.reason.lower()
         mock_score_models.assert_not_called()
 
-    @patch("services.fraud.context.resolve_checkout")
-    @patch("services.fraud.inference.model.score_models")
-    @patch("services.fraud.features.get_features")
-    @patch("routes.fraud.checkout.load_checkouts")
-    def test_fiscal_code_duplicate_trigger(self, mock_load_checkouts, mock_get_features, mock_score_models, mock_resolve, mock_checkout_context, empty_checkouts_df):
-        """Rule: Fiscal code used with multiple emails should trigger BLOCK."""
-        from routes.fraud.checkout import fraud_checkout
-        
-        # FC: 002b2d76-ada1-4e88-99df-9af3fa7bc892
-        ctx = replace(mock_checkout_context,
-            fiscal_code="002b2d76-ada1-4e88-99df-9af3fa7bc892",
-            email="new_email@test.com"
-        )
-        mock_resolve.return_value = ctx
-        
-        # Mock other dependencies
-        mock_load_checkouts.return_value = empty_checkouts_df
+    def test_fiscal_code_duplicate_trigger(
+        self,
+        mock_checkout_context: CheckoutContext,
+        empty_checkouts_df: pd.DataFrame,
+    ) -> None:
+        fiscal_code = "002b2d76-ada1-4e88-99df-9af3fa7bc892"
+        ctx = replace(mock_checkout_context, fiscal_code=fiscal_code, email="new_email@test.com")
 
-        request = CheckoutRequest(checkout_id="test_checkout")
-        response = fraud_checkout(request)
+        response, mock_score_models = self._run_checkout(
+            ctx=ctx,
+            checkouts_df=empty_checkouts_df,
+            fiscal_code_mapping={fiscal_code: {"old@test.com", "other@test.com"}},
+        )
 
         assert response.decision == "BLOCK"
         assert response.rule_triggered == "fiscal_code_duplicate"
-        assert "Fiscal code" in response.reason
-        # Ensure model was NOT called
+        assert "fiscal code" in response.reason.lower()
         mock_score_models.assert_not_called()
 
-    @patch("services.fraud.context.resolve_checkout")
-    @patch("services.fraud.inference.model.score_models")
-    @patch("services.fraud.features.get_features")
-    @patch("routes.fraud.checkout.load_checkouts")
-    @patch("services.fraud.inference.model.Model.feature_columns", new_callable=PropertyMock)
-    @patch("services.fraud.features.request_features.extract_request_features")
-    def test_no_rules_triggered_model_called(self, mock_extract, mock_feat_cols, mock_load_checkouts, mock_get_features, mock_score_models, mock_resolve, mock_checkout_context, mock_scoring_result, empty_checkouts_df):
-        """When no rules trigger, model should be called for decision."""
-        from routes.fraud.checkout import fraud_checkout
-        
-        mock_resolve.return_value = mock_checkout_context
-        mock_score_models.return_value = mock_scoring_result
-        mock_get_features.return_value = {"feat1": 1.0}
-        mock_extract.return_value = {}
-        mock_load_checkouts.return_value = empty_checkouts_df
-        mock_feat_cols.return_value = ["feat1"]
-
-        request = CheckoutRequest(checkout_id="test_checkout")
-        response = fraud_checkout(request)
+    def test_no_rules_triggered_model_called(
+        self,
+        mock_checkout_context: CheckoutContext,
+        mock_scoring_result: ScoringResult,
+        empty_checkouts_df: pd.DataFrame,
+    ) -> None:
+        response, mock_score_models = self._run_checkout(
+            ctx=mock_checkout_context,
+            checkouts_df=empty_checkouts_df,
+            feast_features={"feat1": 1.0},
+            score_result=mock_scoring_result,
+            request_features={},
+        )
 
         assert response.rule_triggered is None
         assert response.score == 0.1
         assert response.decision in ["APPROVE", "BLOCK"]
         mock_score_models.assert_called_once()
 
-    @patch("services.fraud.context.resolve_checkout")
-    @patch("services.fraud.inference.model.score_models")
-    @patch("services.fraud.features.get_features")
-    @patch("routes.fraud.checkout.load_checkouts")
-    def test_payment_failure_rule_trigger(self, mock_load_checkouts, mock_get_features, mock_score_models, mock_resolve, mock_checkout_context, empty_checkouts_df):
-        """Rule: High payment failure rate should trigger BLOCK before model scoring."""
-        from routes.fraud.checkout import fraud_checkout
+    def test_payment_failure_rule_trigger(
+        self,
+        mock_checkout_context: CheckoutContext,
+    ) -> None:
+        completed_checkouts_df = pd.DataFrame(
+            {
+                "customer": ["test_customer"],
+                "status": ["complete"],
+                "mode": ["subscription"],
+                "created": ["2024-01-01T00:00:00"],
+            }
+        )
 
-        # Mock resolve_checkout to return a RETURNING customer context
-        # For a RETURNING customer, we need prior completed checkouts
-        completed_checkouts_df = pd.DataFrame({
-            "customer": ["test_customer"],
-            "status": ["complete"],
-            "mode": ["subscription"],
-            "created": ["2024-01-01T00:00:00"]
-        })
-
-        # Mock features with high failure rate (above 80% threshold with 15+ attempts)
         high_failure_features = {
             "charge_stats_features__failure_rate": 0.85,
             "charge_stats_features__n_charges": 20.0,
@@ -191,54 +214,14 @@ class TestRulesTrigger:
             "payment_intent_stats_features__n_payment_intents": 0.0,
         }
 
-        mock_resolve.return_value = mock_checkout_context
-        mock_load_checkouts.return_value = completed_checkouts_df
-        mock_get_features.return_value = high_failure_features
-
-        request = CheckoutRequest(checkout_id="test_checkout")
-        response = fraud_checkout(request)
-
-        assert response.decision == "BLOCK"
-        assert response.rule_triggered == "payment_failure"
-        assert "failure rate" in response.reason.lower()
-        # Ensure model was NOT called - rule blocks before model scoring
-        mock_score_models.assert_not_called()
-
-    @patch("services.fraud.context.resolve_checkout")
-    @patch("services.fraud.inference.model.score_models")
-    @patch("services.fraud.features.get_features")
-    @patch("routes.fraud.checkout.load_checkouts")
-    def test_payment_failure_rule_trigger(self, mock_load_checkouts, mock_get_features, mock_score_models, mock_resolve, mock_checkout_context, empty_checkouts_df):
-        """Rule: High payment failure rate should trigger BLOCK before model scoring."""
-        from routes.fraud.checkout import fraud_checkout
-
-        # Create a returning customer (has prior completed checkout)
-        returning_checkouts = pd.DataFrame({
-            "customer": ["test_customer"],
-            "status": ["complete"],
-            "mode": ["payment"],
-            "created": ["2024-01-01T00:00:00"]
-        })
-
-        ctx = replace(mock_checkout_context)
-        mock_resolve.return_value = ctx
-        mock_load_checkouts.return_value = returning_checkouts
-
-        # Mock features with high failure rate (above 0.80 threshold with >=15 attempts)
-        mock_get_features.return_value = {
-            "charge_stats_features__failure_rate": 0.85,
-            "charge_stats_features__n_charges": 20.0,
-            "payment_intent_stats_features__failure_rate": 0.0,
-            "payment_intent_stats_features__n_payment_intents": 0.0,
-        }
-
-        request = CheckoutRequest(checkout_id="test_checkout")
-        response = fraud_checkout(request)
+        response, mock_score_models = self._run_checkout(
+            ctx=mock_checkout_context,
+            checkouts_df=completed_checkouts_df,
+            feast_features=high_failure_features,
+        )
 
         assert response.decision == "BLOCK"
         assert response.rule_triggered == "payment_failure"
         assert "failure rate" in response.reason.lower()
-        # Ensure model was NOT called (rule blocks before scoring)
-        mock_score_models.assert_not_called()
-        # Ensure score is None (model was not called)
         assert response.score is None
+        mock_score_models.assert_not_called()
