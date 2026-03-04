@@ -20,17 +20,18 @@ def load_test_data():
     with open(SELECTED_FEATURES_PATH) as f:
         cfg = yaml.safe_load(f)
     training_dir = Path(cfg["training_dir"])
+    if not training_dir.is_absolute():
+        training_dir = REPO_ROOT / training_dir
     test_path = training_dir / "test.parquet"
     logger.info(f"Loading test data from {test_path}")
     return pd.read_parquet(test_path)
 
 def evaluate_rule(y_true, y_pred_triggered, rule_name):
-    # Rules are binary: triggered (1) or not (0)
-    # For ROC AUC and PR AUC, we use the binary trigger as the "score"
+    """Compute rule-level classification metrics from binary trigger outputs."""
     try:
         roc_auc = roc_auc_score(y_true, y_pred_triggered)
     except Exception:
-        roc_auc = 0.5 # Default if only one class present or other error
+        roc_auc = 0.5  # Default if only one class present or other error
         
     try:
         pr_auc = average_precision_score(y_true, y_pred_triggered)
@@ -51,9 +52,8 @@ def evaluate_rule(y_true, y_pred_triggered, rule_name):
         "PR AUC": f"{pr_auc:.3f}"
     }
 
-# Rule Implementations (Simulated for batch evaluation)
-
 def get_blacklist_predictions(df):
+    """Trigger when email appears in the local blacklist JSON."""
     blacklist_path = DATA_DIR / "blacklist.json"
     if blacklist_path.exists():
         with open(blacklist_path) as f:
@@ -63,30 +63,16 @@ def get_blacklist_predictions(df):
     return df["email"].apply(lambda x: 1 if x in emails else 0)
 
 def get_stripe_risk_predictions(df):
-    # Stripe risk level 'highest' is a strong signal.
-    # In the test set, we have 'charge_features__outcome_risk_score'.
-    # Stripe 'highest' risk typically corresponds to score >= 85 (or similar).
-    # However, our rule 'load_charges_with_highest_risk' checks historical data.
-    # A better proxy in the test set is if the PIT-correct score was already high.
-    # But let's look for the actual rule logic: 'outcome_risk_level' == 'highest'.
-    # We don't have 'outcome_risk_level' in test.parquet, only 'charge_features__outcome_risk_score'.
-    # Let's assume score > 90 is 'highest'.
+    """Approximate 'highest' Stripe risk using score >= 90 in test data."""
     return df["charge_features__outcome_risk_score"].apply(lambda x: 1 if (not pd.isna(x) and x >= 90) else 0)
 
 def get_fiscal_code_duplicate_predictions(df):
-    # This rule checks if the SAME fiscal code is used with DIFFERENT emails.
-    # In a batch setting, we can't easily simulate PIT without the full history.
-    # However, we can use the test set as a proxy or just mark it as 0 if we can't compute it accurately.
-    # Let's try a simplified version: if we see multiple emails for one fiscal code in the test set.
-    # BUT PIT IS CRITICAL. 
-    # Actually, let's use the 'customer_profile_features__n_emails_per_fiscal_code' feature which is already in the parquet!
+    """Proxy fiscal-code duplication via n_emails_per_fiscal_code > 1."""
     return df["customer_profile_features__n_emails_per_fiscal_code"].apply(lambda x: 1 if (not pd.isna(x) and x > 1) else 0)
 
 def get_payment_failure_predictions(df):
-    # FAILURE_RATE_THRESHOLD = 0.80
-    # MIN_ATTEMPTS = 15
+    """Trigger when payment failure rate >= 0.80 with at least 15 attempts."""
     def check_pf(row):
-        # Check both payment intent and charge stats
         pi_rate = row.get("payment_intent_stats_features__failure_rate")
         pi_count = row.get("payment_intent_stats_features__n_payment_intents")
         
@@ -105,6 +91,7 @@ def get_payment_failure_predictions(df):
     return df.apply(check_pf, axis=1)
 
 def main():
+    """Run batch-style rule evaluation on the latest test parquet."""
     df = load_test_data()
     y_true = df["label"].values
     
