@@ -90,6 +90,6 @@ docs/
 .cursor/
 AGENTS.md
 CLAUDE.md
-
+GEMINI.md
 .env.local
 logs/
