@@ -7,7 +7,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_REPO_ROOT = Path("/Users/davidelupis/Desktop/Subbyx")
+_REPO_ROOT = Path(__file__).resolve().parents[5]
 _DATA_CLEAN = _REPO_ROOT / "data" / "01-clean"
 _OUTPUT_DIR = _REPO_ROOT / "src" / "backend" / "feature_repo" / "data" / "sources"
 

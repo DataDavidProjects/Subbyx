@@ -10,8 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from logger import setup_logger
 
 
-DATA_PATH = Path("/Users/davidelupis/Desktop/Subbyx/data/01-clean/")
-LOG_PATH = Path("/Users/davidelupis/Desktop/Subbyx/scripts/notebooks/logs/")
+DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "01-clean"
+LOG_PATH = Path(__file__).resolve().parents[2] / "scripts" / "notebooks" / "logs"
 
 logger = setup_logger("raw-data-analysis", LOG_PATH / "raw-data-analysis.log")
 

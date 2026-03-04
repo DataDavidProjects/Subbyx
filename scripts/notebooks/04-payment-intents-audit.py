@@ -20,8 +20,8 @@ from plotly_utils import (
 )
 
 
-DATA_PATH = Path("/Users/davidelupis/Desktop/Subbyx/data/01-clean/")
-LOG_PATH = Path("/Users/davidelupis/Desktop/Subbyx/scripts/notebooks/logs/")
+DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "01-clean"
+LOG_PATH = Path(__file__).resolve().parents[2] / "scripts" / "notebooks" / "logs"
 
 logger = setup_logger("payment-intents-audit", LOG_PATH / "payment-intents-audit.log")
 

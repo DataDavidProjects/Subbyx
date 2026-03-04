@@ -294,8 +294,8 @@ dev-backend: redis
 	sleep 2
 	@echo "Starting MLflow on http://localhost:5002..."
 	cd src/backend && uv run mlflow server --port 5002 \
-		--backend-store-uri sqlite:////Users/davidelupis/Desktop/Subbyx/data/mlflow/mlflow.db \
-		--default-artifact-root /Users/davidelupis/Desktop/Subbyx/data/mlflow/artifacts & \
+		--backend-store-uri sqlite:///$(CURDIR)/data/mlflow/mlflow.db \
+		--default-artifact-root $(CURDIR)/data/mlflow/artifacts & \
 	sleep 3
 	@echo "Starting backend on http://localhost:8001..."
 	cd src/backend && uv run python -m uvicorn main:app --reload --host 127.0.0.1 --port 8001
@@ -318,8 +318,8 @@ mlflow:
 	@echo "Starting MLflow on http://localhost:5002..."
 	@echo "Press Ctrl+C to stop"
 	cd src/backend && uv run mlflow server --port 5002 \
-		--backend-store-uri sqlite:////Users/davidelupis/Desktop/Subbyx/data/mlflow/mlflow.db \
-		--default-artifact-root /Users/davidelupis/Desktop/Subbyx/data/mlflow/artifacts
+		--backend-store-uri sqlite:///$(CURDIR)/data/mlflow/mlflow.db \
+		--default-artifact-root $(CURDIR)/data/mlflow/artifacts
 
 # Register dummy model in MLflow for testing
 model-register:

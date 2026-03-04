@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["fraud-checkout"])
 
-DATA_DIR = Path("/Users/davidelupis/Desktop/Subbyx/data")
+DATA_DIR = Path(__file__).resolve().parents[4] / "data"
 
 REQUEST_TO_MODEL_FEATURE_MAP = {
     "subscription_value": "checkout_features__subscription_value",

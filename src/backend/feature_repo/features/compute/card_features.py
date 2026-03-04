@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 def generate() -> None:
     logger.info("Generating card features...")
 
-    repo_root = Path("/Users/davidelupis/Desktop/Subbyx")
+    repo_root = Path(__file__).resolve().parents[5]
     charges_csv = repo_root / "data" / "01-clean" / "charges.csv"
     output_dir = repo_root / "src" / "backend" / "feature_repo" / "data" / "sources"
 

@@ -15,7 +15,8 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 # Constants
-_TRAINING_BASE = Path("/Users/davidelupis/Desktop/Subbyx/data/04-modeling")
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_TRAINING_BASE = _PROJECT_ROOT / "data" / "04-modeling"
 MLFLOW_SERVER = os.getenv("MLFLOW_SERVER", "http://localhost:5002")
 MODEL_NAME = "fraud-detector"
 BETA = 0.5  # Weight precision 2x more than recall

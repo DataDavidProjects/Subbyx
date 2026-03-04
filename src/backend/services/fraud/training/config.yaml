@@ -2,7 +2,7 @@
 
 # Data paths
 data:
-  training_dir: "/Users/davidelupis/Desktop/Subbyx/data/04-modeling"
+  training_dir: "data/04-modeling"
   date_column: "created"
   checkout_table: "checkouts"
   customer_table: "customers"

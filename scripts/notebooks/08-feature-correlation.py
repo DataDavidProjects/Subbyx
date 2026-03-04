@@ -11,9 +11,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from logger import setup_logger
 
 
-DATA_PATH = Path("/Users/davidelupis/Desktop/Subbyx/data/01-clean/")
-MODEL_PATH = Path("/Users/davidelupis/Desktop/Subbyx/data/04-modeling/")
-LOG_PATH = Path("/Users/davidelupis/Desktop/Subbyx/scripts/notebooks/logs/")
+DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "01-clean"
+MODEL_PATH = Path(__file__).resolve().parents[2] / "data" / "04-modeling"
+LOG_PATH = Path(__file__).resolve().parents[2] / "scripts" / "notebooks" / "logs"
 
 logger = setup_logger("feature-correlation", LOG_PATH / "feature-correlation.log")
 

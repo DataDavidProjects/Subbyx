@@ -9,7 +9,7 @@ def generate() -> None:
     logger.info("Generating base address features...")
 
     # Define paths
-    repo_root = Path("/Users/davidelupis/Desktop/Subbyx")
+    repo_root = Path(__file__).resolve().parents[5]
     address_csv = repo_root / "data" / "01-clean" / "addresses.csv"
     output_dir = repo_root / "src" / "backend" / "feature_repo" / "data" / "sources"
     output_parquet = output_dir / "addresses.parquet"

@@ -11,7 +11,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from logger import logger
 
 
-DATA_DIR = Path("/Users/davidelupis/Desktop/Subbyx/data")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "00-raw"
 CLEAN_DIR = DATA_DIR / "01-clean"
 

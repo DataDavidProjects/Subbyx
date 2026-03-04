@@ -43,6 +43,8 @@ with open(CONFIG_PATH) as f:
     _config = yaml.safe_load(f)
 
 OUTPUT_DIR = Path(_config["data"]["training_dir"])
+if not OUTPUT_DIR.is_absolute():
+    OUTPUT_DIR = PROJECT_ROOT / OUTPUT_DIR
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 _dates = _config["dates"]

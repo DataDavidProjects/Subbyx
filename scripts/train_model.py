@@ -24,8 +24,8 @@ from sklearn.impute import SimpleImputer
 
 import yaml
 
-_TRAINING_BASE = Path("/Users/davidelupis/Desktop/Subbyx/data/04-modeling")
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_TRAINING_BASE = _PROJECT_ROOT / "data" / "04-modeling"
 _SELECTED_FEATURES_YAML = (
     _PROJECT_ROOT / "src" / "backend" / "feature_repo" / "selected_features.yaml"
 )
@@ -62,7 +62,7 @@ def _latest_training_dir() -> Path:
 TRAINING_DIR = _latest_training_dir()
 
 MLFLOW_SERVER = os.getenv("MLFLOW_SERVER", "http://localhost:5002")
-ARTIFACT_ROOT = "/Users/davidelupis/Desktop/Subbyx/data/mlflow/artifacts"
+ARTIFACT_ROOT = str(_PROJECT_ROOT / "data" / "mlflow" / "artifacts")
 REGISTERED_MODEL_NAME = "fraud-detector"
 
 LGBM_PARAMS = {

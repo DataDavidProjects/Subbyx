@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["rules"])
 
-DATA_DIR = Path("/Users/davidelupis/Desktop/Subbyx/data")
+DATA_DIR = Path(__file__).resolve().parents[6] / "data"
 CUSTOMERS_PATH = DATA_DIR / "01-clean" / "customers.csv"
 
 

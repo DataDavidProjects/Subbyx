@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 def generate() -> None:
     logger.info("Generating base payment intent features...")
 
-    repo_root = Path("/Users/davidelupis/Desktop/Subbyx")
+    repo_root = Path(__file__).resolve().parents[5]
     pi_csv = repo_root / "data" / "01-clean" / "payment_intents.csv"
     output_dir = repo_root / "src" / "backend" / "feature_repo" / "data" / "sources"
     output_parquet = output_dir / "payment_intents.parquet"
@@ -63,7 +63,7 @@ def generate() -> None:
 def generate_stats(df: pd.DataFrame) -> None:
     logger.info("Generating payment intent stats features...")
 
-    output_dir = Path("/Users/davidelupis/Desktop/Subbyx/src/backend/feature_repo/data/sources")
+    output_dir = Path(__file__).resolve().parents[2] / "data" / "sources"
     stats_parquet = output_dir / "payment_intent_stats.parquet"
 
     df = df.sort_values(by=["email", "created"]).reset_index(drop=True)
