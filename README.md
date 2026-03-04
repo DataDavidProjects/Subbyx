@@ -283,11 +283,9 @@ Latest reported metrics in this repository:
 | Rules Engine (all) | 146 (17.9%) | 0.185 | 0.276 |
 
 
-### Data Overview
+## Data Overview
 
-
-
-## Table: checkouts
+### Table: checkouts
 
 The checkout table represents **subscription requests** - the act of a customer requesting to subscribe to a device. It is NOT the monthly payment installments.
 
@@ -327,7 +325,7 @@ The checkout table represents **subscription requests** - the act of a customer 
 
 ---
 
-## Table: payment_intents
+### Table: payment_intents
 
 A payment intent is created each time a payment is due from the customer. If an installment is not paid, multiple successive payment intents can be created for that same installment. Usually, a payment intent is created each day until the installment is paid.
 
@@ -348,7 +346,7 @@ A payment intent is created each time a payment is due from the customer. If an 
 
 ---
 
-## Table: charges
+### Table: charges
 
 A charge is created each time a debit attempt is made. This attempt is made starting from a payment intent generated earlier. Each charge is associated with a customer and a payment intent.
 
@@ -376,7 +374,7 @@ A charge is created each time a debit attempt is made. This attempt is made star
 
 ---
 
-## Table: addresses
+### Table: addresses
 
 Addresses are created from the addresses entered by users during purchase.
 
@@ -392,7 +390,7 @@ Addresses are created from the addresses entered by users during purchase.
 
 ---
 
-## Table: stores
+### Table: stores
 
 Sellers are the physical and non-physical stores through which subscriptions are sold.
 
@@ -410,7 +408,7 @@ Sellers are the physical and non-physical stores through which subscriptions are
 
 ---
 
-## Business Notes
+### Business Notes
 
 The goal is to create an anti-fraud system using the approach of your choice.
 
@@ -420,9 +418,9 @@ The other tables can be linked to the `customers` table through the ID columns p
 
 
 
-# Database Schema
+## Database Schema
 
-## Overview
+### Overview
 
 | Table | Rows | Primary Key | Foreign Keys |
 |-------|------|-------------|--------------|
@@ -435,7 +433,7 @@ The other tables can be linked to the `customers` table through the ID columns p
 
 ---
 
-## customers
+### customers
 
 | Column | Type | Description | Notes |
 |--------|------|-------------|-------|
@@ -460,7 +458,7 @@ The other tables can be linked to the `customers` table through the ID columns p
 
 ---
 
-## checkouts
+### checkouts
 
 | Column | Type | Description | Notes |
 |--------|------|-------------|-------|
@@ -484,7 +482,7 @@ The other tables can be linked to the `customers` table through the ID columns p
 
 ---
 
-## payment_intents
+### payment_intents
 
 | Column | Type | Description | Notes |
 |--------|------|-------------|-------|
@@ -503,7 +501,7 @@ The other tables can be linked to the `customers` table through the ID columns p
 
 ---
 
-## charges
+### charges
 
 | Column | Type | Description | Notes |
 |--------|------|-------------|-------|
@@ -529,7 +527,7 @@ The other tables can be linked to the `customers` table through the ID columns p
 
 ---
 
-## addresses
+### addresses
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -543,7 +541,7 @@ The other tables can be linked to the `customers` table through the ID columns p
 
 ---
 
-## stores
+### stores
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -558,7 +556,7 @@ The other tables can be linked to the `customers` table through the ID columns p
 | area | String | Geographic area |
 
 
-### Relationships Summary
+#### Relationships Summary
 
 | From | To | Relationship |
 |------|-----|--------------|
@@ -573,7 +571,7 @@ The other tables can be linked to the `customers` table through the ID columns p
 
 ---
 
-## Data Quality Issues
+### Data Quality Issues
 
 1. **checkouts.csv**: Embedded commas in `product_description` (50% of rows affected)
 2. **charges.csv**: 9 rows lost (0.04%) - trailing empty fields
